@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Report;
+use App\Models\Manifest;
 use Illuminate\Http\Request;
 
-class ReportController extends Controller
+class ManifestController extends Controller
 {
     public function index()
     {
-        return response()->json(Report::all());
+        return response()->json(Manifest::all());
     }
 
     public function store(Request $request)
@@ -31,25 +31,25 @@ class ReportController extends Controller
             'manifest_no' => 'required|string',
         ]);
 
-        $report = Report::create($request->all());
-        return response()->json($report, 201);
+        $manifest = Manifest::create($request->all());
+        return response()->json($manifest, 201);
     }
 
     public function show($id)
     {
-        return response()->json(Report::findOrFail($id));
+        return response()->json(Manifest::findOrFail($id));
     }
 
     public function update(Request $request, $id)
     {
-        $report = Report::findOrFail($id);
-        $report->update($request->all());
-        return response()->json($report);
+        $manifest = Manifest::findOrFail($id);
+        $manifest->update($request->all());
+        return response()->json($manifest);
     }
 
     public function destroy($id)
     {
-        Report::destroy($id);
+        Manifest::destroy($id);
         return response()->json(null, 204);
     }
 }
