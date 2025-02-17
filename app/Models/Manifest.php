@@ -9,9 +9,33 @@ class Manifest extends Model
     use HasFactory;
 
     protected $fillable = [
-        'origin', 'consignor', 'consignee', 'cn_no', 'pcs',
-        'kg', 'gram', 'remarks', 'date', 'awb_no', 'to',
-        'from', 'flt', 'manifest_no'
+        'origin',
+        'consignor_id',
+        'consignee_id',
+        'cn_no',
+        'pcs',
+        'kg',
+        'gram',
+        'remarks',
+        'date',
+        'awb_no',
+        'to',
+        'from',
+        'flt',
+        'manifest_no',
+        'total_price', 
+        'delivery_date',
     ];
+    
+
+    public function consignor()
+    {
+        return $this->belongsTo(Company::class, 'consignor_id');
+    }
+
+    public function consignee()
+    {
+        return $this->belongsTo(Company::class, 'consignee_id');
+    }
 }
 
