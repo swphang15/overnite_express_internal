@@ -10,14 +10,13 @@ use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
-    // 获取所有 manifests，并加载公司信息
+
     public function index()
     {
         $manifests = Manifest::with(['consignor', 'consignee'])->get();
         return response()->json($manifests);
     }
 
-    // 存储新的 manifest 记录（不记录 delivery_date）
     public function store(Request $request)
     {
         $request->validate([
@@ -35,34 +34,38 @@ class ManifestController extends Controller
             'from' => 'required|string',
             'flt' => 'required|string',
             'manifest_no' => 'required|integer',
+            'discount' => 'nullable|numeric|min:0|max:100', // 折扣，范围 0% - 100%
         ]);
-
-        // 查找或创建 Consignor & Consignee
+    
+        // 关联公司
         $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
         $consignee = Company::firstOrCreate(['name' => $request->input('consignee')]);
-
-        // 获取运费规则
+    
+        // 获取运费
         $kg = $request->kg;
+        $gram = $request->gram;
         $origin = $request->from;
         $destination = $request->to;
-
-        $shippingRate = ShippingRate::where('origin', $origin)
-            ->where('destination', $destination)
-            ->first();
-
+        $shippingRate = ShippingRate::where('origin', $origin)->where('destination', $destination)->first();
+    
         if (!$shippingRate) {
             return response()->json(['error' => 'Shipping rate not found for this route'], 400);
         }
-
-        // 计算 total_price
-        if ($kg <= $shippingRate->minimum_weight) {
+    
+        // **计算总价（考虑 KG + Gram）**
+        $total_weight = $kg + ($gram / 1000); // 把 gram 转换成 kg
+        if ($total_weight <= $shippingRate->minimum_weight) {
             $total_price = $shippingRate->minimum_price;
         } else {
-            $extra_kg = $kg - $shippingRate->minimum_weight;
+            $extra_kg = $total_weight - $shippingRate->minimum_weight;
             $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
         }
-
-        // 创建 Manifest（不包含 delivery_date）
+    
+        // **计算折扣后的总价**
+        $discount = $request->discount ?? 0; // 默认为 0%
+        $total_price_after_discount = $total_price * (1 - ($discount / 100));
+    
+        // 存入数据库
         $manifest = Manifest::create([
             'origin' => $request->input('origin'),
             'consignor_id' => $consignor->id,
@@ -78,12 +81,14 @@ class ManifestController extends Controller
             'from' => $request->input('from'),
             'flt' => $request->input('flt'),
             'manifest_no' => $request->input('manifest_no'),
-            'total_price' => $total_price, 
-            'delivery_date' => null, // ❌ 初始为空，等发货后才更新
+            'total_price' => $total_price_after_discount, // 存入折扣后的总价
+            'discount' => $discount, // 记录折扣
+            'delivery_date' => null, 
         ]);
-
+    
         return response()->json($manifest->load(['consignor', 'consignee']), 201);
     }
+    
 
     // 订单确认发货（更新 delivery_date）
     public function confirmShipment($id, Request $request)
@@ -104,18 +109,18 @@ class ManifestController extends Controller
         ]);
     }
 
-    // 获取单个 manifest
+    
     public function show($id)
     {
         $manifest = Manifest::with(['consignor', 'consignee'])->findOrFail($id);
         return response()->json($manifest);
     }
 
-    // 更新 manifest（不允许直接修改 delivery_date）
+    
     public function update(Request $request, $id)
     {
         $manifest = Manifest::findOrFail($id);
-
+    
         $request->validate([
             'origin' => 'sometimes|string',
             'consignor' => 'sometimes|string',
@@ -131,45 +136,54 @@ class ManifestController extends Controller
             'from' => 'sometimes|string',
             'flt' => 'sometimes|string',
             'manifest_no' => 'sometimes|integer',
+            'discount' => 'nullable|numeric|min:0|max:100', // 折扣更新
         ]);
-
+    
         if ($request->has('consignor')) {
             $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
             $manifest->consignor_id = $consignor->id;
         }
-
+    
         if ($request->has('consignee')) {
             $consignee = Company::firstOrCreate(['name' => $request->input('consignee')]);
             $manifest->consignee_id = $consignee->id;
         }
-
-        // 重新计算 total_price（如果 kg 变了）
-        if ($request->has('kg')) {
-            $kg = $request->kg;
+    
+        // **重新计算 total_price**
+        if ($request->has('kg') || $request->has('gram') || $request->has('discount')) {
+            $kg = $request->kg ?? $manifest->kg;
+            $gram = $request->gram ?? $manifest->gram;
+            $discount = $request->discount ?? $manifest->discount;
+    
+            $total_weight = $kg + ($gram / 1000);
             $origin = $request->from ?? $manifest->from;
             $destination = $request->to ?? $manifest->to;
-
-            $shippingRate = ShippingRate::where('origin', $origin)
-                ->where('destination', $destination)
-                ->first();
-
+    
+            $shippingRate = ShippingRate::where('origin', $origin)->where('destination', $destination)->first();
+    
             if ($shippingRate) {
-                if ($kg <= $shippingRate->minimum_weight) {
+                if ($total_weight <= $shippingRate->minimum_weight) {
                     $total_price = $shippingRate->minimum_price;
                 } else {
-                    $extra_kg = $kg - $shippingRate->minimum_weight;
+                    $extra_kg = $total_weight - $shippingRate->minimum_weight;
                     $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
                 }
-                $manifest->total_price = $total_price;
+    
+                // 计算折扣后的总价
+                $total_price_after_discount = $total_price * (1 - ($discount / 100));
+                $manifest->total_price = $total_price_after_discount;
+                $manifest->discount = $discount;
             }
         }
-
+    
+        // 更新数据
         $manifest->update($request->except(['consignor', 'consignee', 'delivery_date']));
-
+    
         return response()->json($manifest->load(['consignor', 'consignee']));
     }
+    
 
-    // 删除 manifest
+    
     public function destroy($id)
     {
         Manifest::destroy($id);

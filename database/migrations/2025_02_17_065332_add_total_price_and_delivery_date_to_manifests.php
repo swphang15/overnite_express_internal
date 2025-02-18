@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('manifests', function (Blueprint $table) {
             $table->decimal('total_price', 10, 2)->after('gram')->default(0); // 添加价格字段
-            $table->date('delivery_date')->after('date')->nullable(); // 添加交付日期字段
+            $table->date('delivery_date')->after('date')->nullable(); // 
             $table->decimal('discount', 5, 2)->default(0); 
         });
     }
