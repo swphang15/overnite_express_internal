@@ -34,14 +34,14 @@ class ManifestController extends Controller
             'from' => 'required|string',
             'flt' => 'required|string',
             'manifest_no' => 'required|integer',
-            'discount' => 'nullable|numeric|min:0|max:100', // 折扣，范围 0% - 100%
+            'discount' => 'nullable|numeric|min:0|max:100', 
         ]);
     
         // 关联公司
         $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
         $consignee = Company::firstOrCreate(['name' => $request->input('consignee')]);
     
-        // 获取运费
+        
         $kg = $request->kg;
         $gram = $request->gram;
         $origin = $request->from;
@@ -52,8 +52,8 @@ class ManifestController extends Controller
             return response()->json(['error' => 'Shipping rate not found for this route'], 400);
         }
     
-        // **计算总价（考虑 KG + Gram）**
-        $total_weight = $kg + ($gram / 1000); // 把 gram 转换成 kg
+        
+        $total_weight = $kg + ($gram / 1000); 
         if ($total_weight <= $shippingRate->minimum_weight) {
             $total_price = $shippingRate->minimum_price;
         } else {
@@ -61,11 +61,11 @@ class ManifestController extends Controller
             $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
         }
     
-        // **计算折扣后的总价**
-        $discount = $request->discount ?? 0; // 默认为 0%
+        
+        $discount = $request->discount ?? 0; 
         $total_price_after_discount = $total_price * (1 - ($discount / 100));
     
-        // 存入数据库
+        
         $manifest = Manifest::create([
             'origin' => $request->input('origin'),
             'consignor_id' => $consignor->id,
@@ -81,8 +81,8 @@ class ManifestController extends Controller
             'from' => $request->input('from'),
             'flt' => $request->input('flt'),
             'manifest_no' => $request->input('manifest_no'),
-            'total_price' => $total_price_after_discount, // 存入折扣后的总价
-            'discount' => $discount, // 记录折扣
+            'total_price' => $total_price_after_discount, 
+            'discount' => $discount, 
             'delivery_date' => null, 
         ]);
     
@@ -90,7 +90,7 @@ class ManifestController extends Controller
     }
     
 
-    // 订单确认发货（更新 delivery_date）
+   
     public function confirmShipment($id, Request $request)
     {
         $manifest = Manifest::findOrFail($id);
