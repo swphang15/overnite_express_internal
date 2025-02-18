@@ -35,7 +35,7 @@ class Manifest extends Model
 
     public function consignee()
     {
-        return $this->belongsTo(Company::class, 'consignee_id');
+        return $this->belongsTo(Agent::class, 'consignee_id');
     }
 }
 

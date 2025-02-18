@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\AgentController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -14,6 +15,8 @@ Route::post('/calculate-shipping', [ShippingController::class, 'calculateShippin
 
 
 Route::get('/companies', [CompanyController::class, 'index']);
+Route::get('/agents', [AgentController::class, 'index']);
+
 Route::apiResource('manifests', ManifestController::class);
 Route::get('/user', function (Request $request) {
     return $request->user();
