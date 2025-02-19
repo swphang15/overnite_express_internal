@@ -28,7 +28,7 @@ class CompanyController extends Controller
      */
     public function show(string $id)
     {
-        //
+        
     }
 
     /**

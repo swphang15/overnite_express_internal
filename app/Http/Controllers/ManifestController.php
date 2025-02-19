@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Manifest;
 use App\Models\Company;
+use App\Models\Agent;
 use App\Models\ShippingRate;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -39,7 +40,7 @@ class ManifestController extends Controller
     
         // 关联公司
         $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
-        $consignee = Company::firstOrCreate(['name' => $request->input('consignee')]);
+        $consignee = Agent::firstOrCreate(['name' => $request->input('consignee')]);
     
         
         $kg = $request->kg;
