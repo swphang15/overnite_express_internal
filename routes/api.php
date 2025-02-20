@@ -18,6 +18,8 @@ Route::get('/companies', [CompanyController::class, 'index']);
 Route::get('/agents', [AgentController::class, 'index']);
 
 Route::apiResource('manifests', ManifestController::class);
+Route::post('/manifests', [ManifestController::class, 'store']);
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');

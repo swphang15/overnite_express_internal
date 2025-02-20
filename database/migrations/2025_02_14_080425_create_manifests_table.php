@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('origin');
             $table->foreignId('consignor_id')->constrained('companies')->onDelete('cascade');
-            $table->foreignId('consignee_id')->constrained('companies')->onDelete('cascade');
+            $table->foreignId('consignee_id')->constrained('agents')->onDelete('cascade');
             $table->integer('cn_no');
             $table->integer('pcs');
             $table->integer('kg');

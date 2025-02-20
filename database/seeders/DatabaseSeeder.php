@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
     $this->call([
         UserSeeder::class, // 运行 UserSeeder
         ShippingRateSeeder::class,
+        CompaniesTableSeeder::class,
+        AgentsTableSeeder::class,
+
     ]);
 }
 
