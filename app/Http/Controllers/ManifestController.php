@@ -11,7 +11,6 @@ use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
-
     public function index()
     {
         $manifests = Manifest::with(['consignor', 'consignee'])->get();
@@ -22,8 +21,8 @@ class ManifestController extends Controller
     {
         $request->validate([
             'origin' => 'required|string',
-            'consignor' => 'required|string',
-            'consignee' => 'required|string',
+            'consignor' => 'required',
+            'consignee' => 'required',
             'cn_no' => 'required|integer',
             'pcs' => 'required|integer',
             'kg' => 'required|integer',
@@ -35,38 +34,44 @@ class ManifestController extends Controller
             'from' => 'required|string',
             'flt' => 'required|string',
             'manifest_no' => 'required|integer',
-            'discount' => 'nullable|numeric|min:0|max:100', 
+            'discount' => 'nullable|numeric|min:0|max:100',
         ]);
-    
-        // 关联公司
-        $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
-        $consignee = Agent::firstOrCreate(['name' => $request->input('consignee')]);
-    
-        
+
+        // 处理 consignor（可以是ID或名称）
+        $consignor = is_numeric($request->input('consignor'))
+            ? Company::find($request->input('consignor'))
+            : Company::firstOrCreate(['name' => $request->input('consignor')]);
+
+        // 处理 consignee（可以是ID或名称）
+        $consignee = is_numeric($request->input('consignee'))
+            ? Agent::find($request->input('consignee'))
+            : Agent::firstOrCreate(['name' => $request->input('consignee')]);
+
+        if (!$consignor || !$consignee) {
+            return response()->json(['error' => 'Consignor or Consignee not found'], 400);
+        }
+
         $kg = $request->kg;
         $gram = $request->gram;
         $origin = $request->from;
         $destination = $request->to;
         $shippingRate = ShippingRate::where('origin', $origin)->where('destination', $destination)->first();
-    
+
         if (!$shippingRate) {
             return response()->json(['error' => 'Shipping rate not found for this route'], 400);
         }
-    
-        
-        $total_weight = $kg + ($gram / 1000); 
+
+        $total_weight = $kg + ($gram / 1000);
         if ($total_weight <= $shippingRate->minimum_weight) {
             $total_price = $shippingRate->minimum_price;
         } else {
             $extra_kg = $total_weight - $shippingRate->minimum_weight;
             $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
         }
-    
-        
-        $discount = $request->discount ?? 0; 
+
+        $discount = $request->discount ?? 0;
         $total_price_after_discount = $total_price * (1 - ($discount / 100));
-    
-        
+
         $manifest = Manifest::create([
             'origin' => $request->input('origin'),
             'consignor_id' => $consignor->id,
@@ -82,16 +87,14 @@ class ManifestController extends Controller
             'from' => $request->input('from'),
             'flt' => $request->input('flt'),
             'manifest_no' => $request->input('manifest_no'),
-            'total_price' => $total_price_after_discount, 
-            'discount' => $discount, 
-            'delivery_date' => null, 
+            'total_price' => $total_price_after_discount,
+            'discount' => $discount,
+            'delivery_date' => null,
         ]);
-    
+
         return response()->json($manifest->load(['consignor', 'consignee']), 201);
     }
-    
 
-   
     public function confirmShipment($id, Request $request)
     {
         $manifest = Manifest::findOrFail($id);
@@ -101,7 +104,6 @@ class ManifestController extends Controller
         }
 
         $deliveryDate = $request->input('delivery_date') ?: Carbon::now()->toDateString();
-
         $manifest->update(['delivery_date' => $deliveryDate]);
 
         return response()->json([
@@ -110,22 +112,20 @@ class ManifestController extends Controller
         ]);
     }
 
-    
     public function show($id)
     {
         $manifest = Manifest::with(['consignor', 'consignee'])->findOrFail($id);
         return response()->json($manifest);
     }
 
-    
     public function update(Request $request, $id)
     {
         $manifest = Manifest::findOrFail($id);
-    
+
         $request->validate([
             'origin' => 'sometimes|string',
-            'consignor' => 'sometimes|string',
-            'consignee' => 'sometimes|string',
+            'consignor' => 'sometimes',
+            'consignee' => 'sometimes',
             'cn_no' => 'sometimes|integer',
             'pcs' => 'sometimes|integer',
             'kg' => 'sometimes|integer',
@@ -137,31 +137,34 @@ class ManifestController extends Controller
             'from' => 'sometimes|string',
             'flt' => 'sometimes|string',
             'manifest_no' => 'sometimes|integer',
-            'discount' => 'nullable|numeric|min:0|max:100', // 折扣更新
+            'discount' => 'nullable|numeric|min:0|max:100',
         ]);
-    
+
         if ($request->has('consignor')) {
-            $consignor = Company::firstOrCreate(['name' => $request->input('consignor')]);
+            $consignor = is_numeric($request->input('consignor'))
+                ? Company::find($request->input('consignor'))
+                : Company::firstOrCreate(['name' => $request->input('consignor')]);
             $manifest->consignor_id = $consignor->id;
         }
-    
+
         if ($request->has('consignee')) {
-            $consignee = Company::firstOrCreate(['name' => $request->input('consignee')]);
+            $consignee = is_numeric($request->input('consignee'))
+                ? Agent::find($request->input('consignee'))
+                : Agent::firstOrCreate(['name' => $request->input('consignee')]);
             $manifest->consignee_id = $consignee->id;
         }
-    
-        // **重新计算 total_price**
+
         if ($request->has('kg') || $request->has('gram') || $request->has('discount')) {
             $kg = $request->kg ?? $manifest->kg;
             $gram = $request->gram ?? $manifest->gram;
             $discount = $request->discount ?? $manifest->discount;
-    
+
             $total_weight = $kg + ($gram / 1000);
             $origin = $request->from ?? $manifest->from;
             $destination = $request->to ?? $manifest->to;
-    
+
             $shippingRate = ShippingRate::where('origin', $origin)->where('destination', $destination)->first();
-    
+
             if ($shippingRate) {
                 if ($total_weight <= $shippingRate->minimum_weight) {
                     $total_price = $shippingRate->minimum_price;
@@ -169,22 +172,18 @@ class ManifestController extends Controller
                     $extra_kg = $total_weight - $shippingRate->minimum_weight;
                     $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
                 }
-    
-                // 计算折扣后的总价
+
                 $total_price_after_discount = $total_price * (1 - ($discount / 100));
                 $manifest->total_price = $total_price_after_discount;
                 $manifest->discount = $discount;
             }
         }
-    
-        // 更新数据
+
         $manifest->update($request->except(['consignor', 'consignee', 'delivery_date']));
-    
+
         return response()->json($manifest->load(['consignor', 'consignee']));
     }
-    
 
-    
     public function destroy($id)
     {
         Manifest::destroy($id);
