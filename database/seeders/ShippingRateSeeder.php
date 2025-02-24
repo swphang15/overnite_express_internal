@@ -16,14 +16,7 @@ class ShippingRateSeeder extends Seeder
             ['origin' => 'KCH', 'destination' => 'SBW', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.40],
             ['origin' => 'KCH', 'destination' => 'BTU', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.80],
             ['origin' => 'KCH', 'destination' => 'MYY', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.90],
-            ['origin' => 'KCH', 'destination' => 'BKI', 'minimum_price' => 20.00, 'minimum_weight' => 5, 'additional_price_per_kg' => 4.50],
-        
-            // 反向运费
-            ['origin' => 'KUL', 'destination' => 'KCH', 'minimum_price' => 20.00, 'minimum_weight' => 5, 'additional_price_per_kg' => 4.00],
-            ['origin' => 'SBW', 'destination' => 'KCH', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.40],
-            ['origin' => 'BTU', 'destination' => 'KCH', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.80],
-            ['origin' => 'MYY', 'destination' => 'KCH', 'minimum_price' => 5.00, 'minimum_weight' => 1, 'additional_price_per_kg' => 1.90],
-            ['origin' => 'BKI', 'destination' => 'KCH', 'minimum_price' => 20.00, 'minimum_weight' => 5, 'additional_price_per_kg' => 4.50],
+            ['origin' => 'KCH', 'destination' => 'BKI', 'minimum_price' => 20.00, 'minimum_weight' => 5, 'additional_price_per_kg' => 4.50]
         ]);
         
     }
