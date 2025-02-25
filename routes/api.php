@@ -7,16 +7,16 @@ use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\ShippingController;
-use App\Models\Agent;
-use App\Models\Company;
 use App\Http\Controllers\InvoiceExportController;
+use App\Http\Controllers\ClientController;
+
 
 
 Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel']);
 
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/register', [ClientController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 Route::get('/shipping-rates', [ShippingController::class, 'index']);

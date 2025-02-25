@@ -11,7 +11,7 @@ class Manifest extends Model
     protected $fillable = [
         'origin',
         'consignor_id',
-        'consignee_id',
+        'consignee_name',
         'cn_no',
         'pcs',
         'kg',
@@ -33,9 +33,6 @@ class Manifest extends Model
         return $this->belongsTo(Company::class, 'consignor_id');
     }
 
-    public function consignee()
-    {
-        return $this->belongsTo(Agent::class, 'consignee_id');
-    }
+
 }
 
