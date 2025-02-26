@@ -6,6 +6,7 @@ use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 class ClientController extends Controller
 {
     public function index()
@@ -14,25 +15,31 @@ class ClientController extends Controller
     }
     public function register(Request $request)
 {
-    $request->validate([
-        'company_name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:clients',
-        'password' => 'required|string|min:6|confirmed',
-    ]);
+    try {
+        $request->validate([
+            'company_name' => 'required|string|max:255|unique:clients,company_name',
+            'email' => 'required|string|email|max:255|unique:clients,email',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
 
-    // ✅ 将 create() 的返回值存入变量
-    $client = Client::create([
-        'company_name' => $request->company_name,
-        'email' => $request->email,
-        'password' => bcrypt($request->password),
- 
-    ]);
+        $client = Client::create([
+            'company_name' => $request->company_name,
+            'email' => $request->email,
+            'password' => bcrypt($request->password),
+        ]);
 
-    return response()->json([
-        'message' => 'User registered successfully!',
-        'client' => $client, // ✅ 现在 $client 变量已经正确定义
-    ], 201);
+        return response()->json([
+            'message' => 'User registered successfully!',
+            'client' => $client,
+        ], 201);
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors(),
+        ], 422);
+    }
 }
+
 public function login(Request $request)
 {
     $request->validate([

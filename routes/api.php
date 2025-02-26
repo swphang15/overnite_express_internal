@@ -30,8 +30,8 @@ Route::get('/agents', function () {
     return response()->json(Agent::all());
 });
 
-Route::get('/companies', function () {
-    return response()->json(Company::all());
+Route::get('/clients', function () {
+    return response()->json(Client::all());
 });
 Route::apiResource('manifests', ManifestController::class);
 Route::post('/manifests', [ManifestController::class, 'store']);
