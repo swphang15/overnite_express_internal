@@ -13,16 +13,22 @@ class ManifestController extends Controller
 {
 
     public function createManifestFormData()
-    {
-        $from = ShippingRate::distinct()->pluck('origin');
-        $to = ShippingRate::distinct()->pluck('destination');
-        $companies = Client::select(["id","company_name"])->get();
-        return response()->json([
-            "companies"=>$companies,
-            "from"=>$from,
-            "to"=>$to
-        ]);
-    }
+{
+    $from = ShippingRate::distinct()->pluck('origin');
+    $to = ShippingRate::distinct()->pluck('destination');
+
+    // 只获取非 admin 的公司
+    $companies = Client::where('role', '!=', 'admin')
+                        ->select(["id", "company_name"])
+                        ->get();
+
+    return response()->json([
+        "companies" => $companies,
+        "from" => $from,
+        "to" => $to
+    ]);
+}
+
 
     public function index()
     {
