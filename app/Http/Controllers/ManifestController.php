@@ -16,7 +16,9 @@ class ManifestController extends Controller
     {
         $from = ShippingRate::distinct()->pluck('origin');
         $to = ShippingRate::distinct()->pluck('destination');
+        $companies = Client::select(["id","company_name"])->get();
         return response()->json([
+            "companies"=>$companies,
             "from"=>$from,
             "to"=>$to
         ]);
