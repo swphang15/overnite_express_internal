@@ -19,7 +19,9 @@ class DatabaseSeeder extends Seeder
        
        
         CompaniesTableSeeder::class,
-     
+       ShippingRatesSeeder::class,
+
+        
 
     ]);
 }

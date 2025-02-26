@@ -17,8 +17,8 @@ Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel']);
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [ClientController::class, 'login']);
+Route::post('/register', [ClientController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 Route::get('/shipping-rates', [ShippingController::class, 'index']);
