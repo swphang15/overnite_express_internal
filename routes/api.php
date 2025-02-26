@@ -12,6 +12,8 @@ use App\Http\Controllers\ClientController;
 
 
 
+Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
+
 Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel']);
 
@@ -33,6 +35,10 @@ Route::get('/companies', function () {
 });
 Route::apiResource('manifests', ManifestController::class);
 Route::post('/manifests', [ManifestController::class, 'store']);
+Route::put('/manifests/{id}', [ManifestController::class, 'update']);
+// 删除 manifest
+Route::delete('/manifests/{id}', [ManifestController::class, 'destroy']);
+
 
 Route::get('/user', function (Request $request) {
     return $request->user();

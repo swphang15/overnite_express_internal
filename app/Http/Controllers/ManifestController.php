@@ -109,7 +109,7 @@ class ManifestController extends Controller
 
     public function show($id)
     {
-        $manifest = Manifest::with(['consignor'])->findOrFail($id);
+        $manifest = Manifest::with(['consignor','consignee', 'items'])->findOrFail($id);
         return response()->json($manifest);
     }
 
@@ -135,38 +135,38 @@ class ManifestController extends Controller
         'discount' => 'nullable|numeric|min:0|max:100',
     ]);
 
+    // **处理 Consignor**
     if ($request->has('consignor')) {
         $consignor = is_numeric($request->input('consignor'))
-            ? Client::where('role', 'client')->find($request->input('consignor')) // 只查 role = 'client'
-            : Client::firstOrCreate(
-                ['company_name' => $request->input('consignor')],
-                ['role' => 'client'] // 确保新建的也是 client 角色
-            );
-    
+            ? Client::find($request->input('consignor')) 
+            : Client::firstOrCreate(['name' => $request->input('consignor')]);
+
         if ($consignor) {
             $manifest->consignor_id = $consignor->id;
         } else {
             return response()->json(['error' => 'Invalid consignor'], 400);
         }
     }
-    
 
+    // **处理 Consignee**
     if ($request->has('consignee')) {
-        $manifest->consignee_name = $request->input('consignee'); // 直接存字符串
+        $manifest->consignee_name = $request->input('consignee');
     }
 
-    if ($request->has('kg') || $request->has('gram') || $request->has('discount')) {
-        $kg = $request->kg ?? $manifest->kg;
-        $gram = $request->gram ?? $manifest->gram;
-        $discount = $request->discount ?? $manifest->discount;
+    // **计算新价格**
+    if ($request->hasAny(['kg', 'gram', 'discount', 'from', 'to'])) {
+        $kg = $request->input('kg', $manifest->kg);
+        $gram = $request->input('gram', $manifest->gram);
+        $discount = $request->input('discount', $manifest->discount);
+        $origin = $request->input('from', $manifest->from);
+        $destination = $request->input('to', $manifest->to);
 
-        $total_weight = $kg + ($gram / 1000);
-        $origin = $request->from ?? $manifest->from;
-        $destination = $request->to ?? $manifest->to;
-
-        $shippingRate = ShippingRate::where('origin', $origin)->where('destination', $destination)->first();
+        $shippingRate = ShippingRate::where('origin', $origin)
+            ->where('destination', $destination)
+            ->first();
 
         if ($shippingRate) {
+            $total_weight = $kg + ($gram / 1000);
             if ($total_weight <= $shippingRate->minimum_weight) {
                 $total_price = $shippingRate->minimum_price;
             } else {
@@ -180,10 +180,12 @@ class ManifestController extends Controller
         }
     }
 
+    // **更新数据**
     $manifest->update($request->except(['consignor', 'consignee', 'delivery_date']));
 
     return response()->json($manifest->load('consignor'));
 }
+
 
 
     public function destroy($id)

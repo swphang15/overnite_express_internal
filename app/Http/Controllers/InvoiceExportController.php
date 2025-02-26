@@ -3,30 +3,42 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Manifest; // 确保 Manifest 代替 Invoice
+use App\Exports\ManifestExport;
+use App\Models\ShippingRate;
+use App\Models\Manifest;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Exports\ManifestExport;
 
 class InvoiceExportController extends Controller
 {
-    // 生成 PDF 并返回下载
-    public function exportPDF($id)
+    // 导出 Excel
+    public function exportExcel($manifestId)
+    {
+        return Excel::download(new InvoiceExportController($manifestId), 'manifest.xlsx');
+    }
+
+    // 生成 PDF
+    public function exportPdf(Request $request)
 {
-    // 直接查询 Manifest，不使用 with('items')
-    $manifest = Manifest::findOrFail($id);
+    // 从请求中获取 manifest ID 列表（可以是多个）
+    $manifestIds = $request->input('manifest_ids'); // 传入数组形式
 
-    // 载入 PDF 视图并传递数据
-    $pdf = Pdf::loadView('pdf.manifest', compact('manifest'));
+    // 查询所有匹配的 manifest 数据
+    $manifests = Manifest::whereIn('id', $manifestIds)->get();
 
-    return $pdf->download("Manifest_{$manifest->id}.pdf");
+    // 遍历每个 manifest 计算价格
+    foreach ($manifests as $manifest) {
+        $shippingRate = ShippingRate::where('origin', [$manifest->from])
+        ->where('destination', [$manifest->to])
+        ->first();
+
+        $manifest->price_per_kg = $shippingRate ? $shippingRate->additional_price_per_kg : 0;
+    }
+
+    // 生成 PDF
+    $pdf = Pdf::loadView('manifest_pdf', compact('manifests',));
+
+    // 下载 PDF
+    return $pdf->download('manifest.pdf');
 }
-
-
-    // 生成 Excel 并返回下载
-    public function exportExcel($id)
-{
-    return Excel::download(new ManifestExport($id), "Manifest_{$id}.xlsx");
-}
-
 }

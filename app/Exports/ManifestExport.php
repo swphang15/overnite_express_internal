@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Manifest;
+use App\Models\ShippingRate;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
@@ -17,24 +18,38 @@ class ManifestExport implements FromCollection, WithHeadings
 
     public function collection()
     {
-        $manifest = Manifest::findOrFail($this->manifestId);
+        $manifests = Manifest::where('id', $this->manifestId)->get();
 
-        return collect([
-            [
-                'ID' => $manifest->id,
-                'Origin' => $manifest->origin,
-                'Consignor ID' => $manifest->consignor_id,
-                'Consignee ID' => $manifest->consignee_id,
-                'CN No' => $manifest->cn_no,
-                'Total Price' => $manifest->total_price,
-                'Date' => $manifest->date,
-                'AWB No' => $manifest->awb_no,
-            ]
-        ]);
+        return $manifests->map(function ($manifest, $index) {
+            // **确保大小写匹配**
+            $shippingRate = ShippingRate::where('origin', [$manifest->from])
+                                        ->where('destination', [$manifest->to])
+                                        ->first();
+
+                                        
+        
+            // **如果匹配不到数据，调试看看 manifest->from 和 manifest->to 是什么**
+            if (!$shippingRate) {
+                \Log::error("No shipping rate found for origin: {$manifest->from}, destination: {$manifest->to}");
+            }
+        
+            $pricePerKg = $shippingRate ? $shippingRate->additional_price_per_kg : 0;
+        
+            return [
+                'Item' => $index + 1,
+                'Description' => "{$manifest->from} - {$manifest->to}",
+                'Consignment Note' => $manifest->cn_no,
+                'Delivery Date' => $manifest->date,
+                'Qty' => $manifest->pcs,
+                'U/ Price RM' => number_format($pricePerKg, 2),
+                'Total RM' => number_format($manifest->total_price, 2),
+            ];
+        });
+        
     }
 
     public function headings(): array
     {
-        return ["ID", "Origin", "Consignor ID", "Consignee ID", "CN No", "Total Price", "Date", "AWB No"];
+        return ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "U/ Price RM", "Total RM"];
     }
 }
