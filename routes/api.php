@@ -30,6 +30,7 @@ Route::get('/shipping_rates', [ShippingController::class, 'index']);
 Route::post('/shipping_rates', [ShippingController::class, 'store']);
 Route::post('/calculate_shipping', [ShippingController::class, 'calculateShipping']);
 
+Route::get('/create_manifest_form_data', [ManifestController::class, 'createManifestFormData']);
 
 Route::get('/agents', function () {
     return response()->json(Agent::all());

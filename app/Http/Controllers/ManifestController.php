@@ -11,6 +11,17 @@ use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
+
+    public function createManifestFormData()
+    {
+        $from = ShippingRate::distinct()->pluck('origin');
+        $to = ShippingRate::distinct()->pluck('destination');
+        return response()->json([
+            "from"=>$from,
+            "to"=>$to
+        ]);
+    }
+
     public function index()
     {
         $manifests = Manifest::with(['consignor', 'consignee'])->get();
