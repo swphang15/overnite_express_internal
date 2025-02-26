@@ -1,14 +1,15 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
-class Client extends Model
+class Client extends Authenticatable
 {
-    use HasFactory;
+    use HasApiTokens, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'company_name',
@@ -19,16 +20,17 @@ class Client extends Model
     protected $hidden = [
         'password',
     ];
+
     public function sentManifests()
     {
         return $this->hasMany(Manifest::class, 'consignor_id');
     }
 
-    // 自动加密密码
-    public function setPasswordAttribute($value)
-    {
-        $this->attributes['password'] = bcrypt($value);
-    }
+    // // ⚠️ 如果用 setPasswordAttribute()，register 里不能用 Hash::make()
+    // public function setPasswordAttribute($value)
+    // {
+    //     $this->attributes['password'] = bcrypt($value);
+    // }
 
     // 自动设置 role
     protected static function boot()
@@ -36,12 +38,7 @@ class Client extends Model
         parent::boot();
 
         static::creating(function ($client) {
-            // 如果 email 里包含 "admin"，就设置 role = admin，否则默认 client
-            if (strpos($client->email, 'admin') !== false) {
-                $client->role = 'admin';
-            } else {
-                $client->role = 'client';
-            }
+            $client->role = str_contains($client->email, 'admin') ? 'admin' : 'client';
         });
     }
 }
