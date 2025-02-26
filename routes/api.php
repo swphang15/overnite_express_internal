@@ -21,9 +21,14 @@ Route::post('/login', [ClientController::class, 'login']);
 Route::post('/register', [ClientController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
-Route::get('/shipping-rates', [ShippingController::class, 'index']);
-Route::post('/shipping-rates', [ShippingController::class, 'store']);
-Route::post('/calculate-shipping', [ShippingController::class, 'calculateShipping']);
+
+
+Route::get('/shipping-rates/origins', [ShippingController::class, 'getUniqueOrigins']);
+Route::get('/shipping-rates/destinations', [ShippingController::class, 'getUniqueDestinations']);
+
+Route::get('/shipping_rates', [ShippingController::class, 'index']);
+Route::post('/shipping_rates', [ShippingController::class, 'store']);
+Route::post('/calculate_shipping', [ShippingController::class, 'calculateShipping']);
 
 
 Route::get('/agents', function () {

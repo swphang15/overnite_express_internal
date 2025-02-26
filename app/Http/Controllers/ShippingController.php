@@ -9,6 +9,21 @@ use App\Models\ShippingRate;
 class ShippingController extends Controller
 {
     // 获取所有运费
+  // 获取唯一的 origin
+public function getUniqueOrigins()
+{
+    $uniqueOrigins = ShippingRate::distinct()->pluck('origin');
+    return response()->json($uniqueOrigins);
+}
+
+// 获取唯一的 destination
+public function getUniqueDestinations()
+{
+    $uniqueDestinations = ShippingRate::distinct()->pluck('destination');
+    return response()->json($uniqueDestinations);
+}
+
+
     public function index()
     {
         return response()->json(ShippingRate::all());
