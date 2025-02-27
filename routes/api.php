@@ -40,8 +40,9 @@ Route::get('/clients', function () {
     return response()->json(Client::all());
 });
 Route::apiResource('manifests', ManifestController::class);
+
 Route::post('/manifests', [ManifestController::class, 'store']);
-Route::put('/manifests/{id}', [ManifestController::class, 'update']);
+Route::put('/manifests/manifest', [ManifestController::class, 'update']);
 // 删除 manifest
 Route::delete('/manifests/{id}', [ManifestController::class, 'destroy']);
 
