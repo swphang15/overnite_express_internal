@@ -155,18 +155,18 @@ class ManifestController extends Controller
             'manifest_number' => $manifest->manifest_number,
         ];
     
-        // 处理 Consignor
-        if ($request->has('consignor')) {
-            $consignor = is_numeric($request->input('consignor'))
-                ? Client::find($request->input('consignor'))
-                : Client::firstOrCreate(['name' => $request->input('consignor')]);
+        // // 处理 Consignor
+        // if ($request->has('consignor')) {
+        //     $consignor = is_numeric($request->input('consignor'))
+        //         ? Client::find($request->input('consignor'))
+        //         : Client::firstOrCreate(['name' => $request->input('consignor')]);
     
-            if ($consignor) {
-                $manifest->consignor_id = $consignor->id;
-            } else {
-                return response()->json(['error' => 'Invalid consignor'], 400);
-            }
-        }
+        //     if ($consignor) {
+        //         $manifest->consignor_id = $consignor->id;
+        //     } else {
+        //         return response()->json(['error' => 'Invalid consignor'], 400);
+        //     }
+        // }
     
         // 处理 Consignee 和其他字段
         if ($request->has('consignee')) {
