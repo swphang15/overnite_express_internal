@@ -35,6 +35,8 @@ Route::get('/create_manifest_form_data', [ManifestController::class, 'createMani
 Route::get('/agents', function () {
     return response()->json(Agent::all());
 });
+Route::get('/clients/{id}', [ClientController::class, 'show']);
+
 Route::get('/clients', [ClientController::class, 'index']);
 
 Route::apiResource('manifests', ManifestController::class);

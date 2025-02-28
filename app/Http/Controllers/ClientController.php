@@ -69,5 +69,15 @@ public function login(Request $request)
         'token' => $token,
     ]);
 }
+public function show($id)
+{
+    $client = Client::find($id);
+
+    if (!$client) {
+        return response()->json(['message' => 'Client not found'], 404);
+    }
+
+    return response()->json($client);
+}
 
 }
