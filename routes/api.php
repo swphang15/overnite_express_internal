@@ -13,11 +13,14 @@ use App\Http\Controllers\ClientController;
 
 
 Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
-
+Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
+Route::post('/manifest/excel', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel']);
 
 Route::post('/login', [ClientController::class, 'login']);
+Route::middleware('auth:sanctum')->put('/client/update', [ClientController::class, 'updateProfile']);
+
 Route::post('/register', [ClientController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 

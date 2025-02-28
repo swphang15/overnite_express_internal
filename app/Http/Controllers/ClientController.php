@@ -79,5 +79,37 @@ public function show($id)
 
     return response()->json($client);
 }
+public function updateProfile(Request $request)
+{
+    $client = Auth::user(); // 获取当前登录用户
+
+    if (!$client) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    $request->validate([
+        'company_name' => 'sometimes|string|max:255|unique:clients,company_name,' . $client->id,
+        'email' => 'sometimes|email|max:255|unique:clients,email,' . $client->id,
+        'password' => 'sometimes|string|min:6|confirmed',
+    ]);
+
+    if ($request->has('company_name')) {
+        $client->company_name = $request->company_name;
+    }
+    if ($request->has('email')) {
+        $client->email = $request->email;
+    }
+    if ($request->has('password')) {
+        $client->password = bcrypt($request->password);
+    }
+
+    $client->save();
+
+    return response()->json([
+        'message' => 'Profile updated successfully!',
+        'client' => $client,
+    ]);
+}
+
 
 }
