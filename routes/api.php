@@ -20,6 +20,7 @@ Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel
 
 Route::post('/login', [ClientController::class, 'login']);
 Route::middleware('auth:sanctum')->put('/client/update', [ClientController::class, 'updateProfile']);
+Route::middleware('auth:sanctum')->get('/client/profile', [ClientController::class, 'profile']);
 
 Route::post('/register', [ClientController::class, 'register']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);

@@ -79,6 +79,17 @@ public function show($id)
 
     return response()->json($client);
 }
+public function profile()
+{
+    $client = Auth::user(); // 获取当前登录用户
+
+    if (!$client) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    return response()->json($client);
+}
+
 public function updateProfile(Request $request)
 {
     $client = Auth::user(); // 获取当前登录用户
