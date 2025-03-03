@@ -116,14 +116,9 @@ class ClientController extends Controller
     {
         $client = Auth::user(); // 获取当前登录用户
 
-        if (!$client) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
         $request->validate([
             'company_name' => 'sometimes|string|max:255|unique:clients,company_name,' . $client->id,
             'email'        => 'sometimes|email|max:255|unique:clients,email,' . $client->id,
-            'password'     => 'sometimes|string|min:6|confirmed',
         ]);
 
         if ($request->has('company_name')) {
@@ -131,10 +126,6 @@ class ClientController extends Controller
         }
         if ($request->has('email')) {
             $client->email = $request->email;
-        }
-        if ($request->has('password')) {
-            // 如果需要不输入旧密码就能改密码，直接用这段
-            $client->password = bcrypt($request->password);
         }
 
         $client->save();
@@ -158,12 +149,13 @@ class ClientController extends Controller
 
         // 要求用户提供旧密码、新密码并确认
         $request->validate([
-            'old_password' => 'required|string',
+            'current_password' => 'required|string',
             'password'     => 'required|string|min:6|confirmed',
+            'password_confirmation' => 'required|min:6',
         ]);
 
         // 验证旧密码是否正确
-        if (!Hash::check($request->old_password, $client->password)) {
+        if (!Hash::check($request->current_password, $client->password)) {
             return response()->json(['message' => 'Old password is incorrect'], 400);
         }
 
