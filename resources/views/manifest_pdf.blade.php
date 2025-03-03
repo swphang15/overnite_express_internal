@@ -35,13 +35,24 @@
             color: #4076d4;
         }
 
-        /* 横向布局 */
-        @media print {
-            body {
-                width: 100%;
-                height: auto;
-                transform: rotate(90deg);
-            }
+        /* 左右对齐样式 */
+        .invoice-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 0;
+        }
+
+        .company-info, .invoice-info {
+            width: 48%;
+        }
+
+        .company-info {
+            text-align: left;
+        }
+
+        .invoice-info {
+            text-align: right;
         }
 
         /* 按钮样式 */
@@ -102,13 +113,13 @@
     </div>
 
     <!-- 公司 & 发票信息 -->
-    <div class="row">
-        <div class="col-6">
+    <div class="invoice-container">
+        <div class="company-info">
             <p><strong>COMPANY A</strong></p>
             <p><strong>CLIENT / DESTINATION</strong></p>
             <p>TEL: 01358838822 &nbsp;&nbsp;&nbsp; FAX: 082-2344332</p>
         </div>
-        <div class="col-6 text-end">
+        <div class="invoice-info">
             <p><strong>No. : I-2411-13</strong></p>
             <p>Your Ref. : Y13827442</p>
             <p>Our D/O No. : 123</p>
