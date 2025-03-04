@@ -10,7 +10,7 @@ use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\InvoiceExportController;
 use App\Http\Controllers\ClientController;
 
-
+Route::post('/export-excel', [InvoiceExportController::class, 'exportExcel']);
 
 Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
 Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);

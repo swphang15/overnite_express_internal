@@ -12,23 +12,18 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceExportController extends Controller
 {
-    // 导出 Excel
     public function exportExcel(Request $request)
-    {
-        // 从请求获取 manifest ID 数组
-        $manifestIds = $request->input('manifest_ids');
-    
-        // 查询所有匹配的 manifest
-        $manifests = Manifest::whereIn('id', $manifestIds)->get();
-        
-    
-        if ($manifests->isEmpty()) {
-            return response()->json(['error' => '未找到匹配的 Manifest'], 404);
-        }
-    
-        // 生成 Excel
-        return Excel::download(new ManifestExport($manifests), 'manifests.xlsx');
+{
+    $manifestIds = $request->input('manifest_ids');
+
+    if (empty($manifestIds)) {
+        return response()->json(['error' => '未提供 Manifest ID'], 400);
     }
+
+    return Excel::download(new ManifestExport($manifestIds), 'manifests.xlsx');
+}
+
+    
     
 
     // 生成 PDF
