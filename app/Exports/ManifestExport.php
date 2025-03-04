@@ -20,13 +20,18 @@ class ManifestExport implements FromCollection, WithHeadings
     public function collection()
     {
         $manifests = Manifest::whereIn('id', $this->manifestIds)->get();
+        $totalPriceSum = 0;
 
-        return new Collection($manifests->map(function ($manifest, $index) {
+        $data = $manifests->map(function ($manifest, $index) use (&$totalPriceSum) {
             $shippingRate = ShippingRate::where('origin', $manifest->from)
                                         ->where('destination', $manifest->to)
                                         ->first();
 
             $pricePerKg = $shippingRate ? $shippingRate->additional_price_per_kg : 0;
+            $discount = 0; // 默认折扣为 0
+            $totalPrice = $manifest->total_price;
+
+            $totalPriceSum += $totalPrice; // 计算总金额
 
             return [
                 'Item' => $index + 1,
@@ -35,13 +40,37 @@ class ManifestExport implements FromCollection, WithHeadings
                 'Delivery Date' => $manifest->date,
                 'Qty' => $manifest->pcs,
                 'U/ Price RM' => number_format($pricePerKg, 2),
-                'Total RM' => number_format($manifest->total_price, 2),
+                'Disc. (RM)' => number_format($discount, 2), // 折扣列
+                'Total RM' => number_format($totalPrice, 2),
             ];
-        }));
+        });
+
+        // 添加总计行
+        $data->push([
+            'Item' => '',
+            'Description' => '',
+            'Consignment Note' => '',
+            'Delivery Date' => '',
+            'Qty' => '',
+            'U/ Price RM' => '',
+            'Disc. (RM)' => 'Total Price:',
+            'Total RM' => number_format($totalPriceSum, 2),
+        ]);
+
+        return new Collection($data);
     }
 
     public function headings(): array
     {
-        return ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "U/ Price RM", "Total RM"];
+        return [
+            "Item", 
+            "Description", 
+            "Consignment Note", 
+            "Delivery Date", 
+            "Qty", 
+            "U/ Price RM", 
+            "Disc. (RM)", 
+            "Total RM"
+        ];
     }
 }

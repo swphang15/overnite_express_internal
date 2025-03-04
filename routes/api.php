@@ -14,9 +14,8 @@ Route::post('/export-excel', [InvoiceExportController::class, 'exportExcel']);
 
 Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
 Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
-Route::post('/manifest/excel', [InvoiceExportController::class, 'exportPDF']);
 Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
-Route::get('/manifest/excel/{id}', [InvoiceExportController::class, 'exportExcel']);
+
 
 Route::post('/register', [ClientController::class, 'register']);
 Route::post('/login', [ClientController::class, 'login']);
