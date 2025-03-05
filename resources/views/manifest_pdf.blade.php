@@ -15,11 +15,14 @@
             color: #484b51;
             background: #fff;
         }
-        
+
+        /* 让 INVOICE 和 No. : I-2411-13 在同一行 */
         .page-header {
+            display: flex;
+            align-items: center;
             border-bottom: 2px solid #e2e2e2;
             padding-bottom: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
 
         .invoice-title {
@@ -28,23 +31,36 @@
             color: #4076d4;
         }
 
+        .invoice-number {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+
         /* 让公司信息和发票信息严格对齐 */
         .info-table {
             width: 100%;
+            border-collapse: collapse;
         }
 
         .info-table td {
             vertical-align: top;
-            padding: 5px;
+            padding: 2px;  /* 减少间距 */
         }
 
         .info-right {
             text-align: right;
         }
 
-        /* 表格样式 */
+        /* 让每个数据之间的行距固定 */
+        .info-table p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* 发票表格 */
         .table-container {
-            margin-top: 30px;
+            margin-top: 15px;
         }
 
         .data-table {
@@ -54,8 +70,9 @@
         }
 
         .data-table th, .data-table td {
-            padding: 10px;
+            padding: 8px;
             border: 1px solid #ddd;
+            height: 35px; /* 固定行高 */
         }
 
         .data-table th {
@@ -78,9 +95,10 @@
 </head>
 <body>
 
-    <!-- Invoice 标题 -->
-    <div class="page-header">
+    <!-- Invoice 标题 和 发票编号 -->
+    <div class="page-header d-flex align-items-center">
         <h1 class="invoice-title">INVOICE</h1>
+        <p class="invoice-number ms-auto">No. : I-2411-13</p>
     </div>
 
     <!-- 公司 & 发票信息 -->
@@ -92,7 +110,6 @@
                 <p>TEL: 01358838822 &nbsp;&nbsp;&nbsp; FAX: 082-2344332</p>
             </td>
             <td class="info-right">
-                <p><strong>No. : I-2411-13</strong></p>
                 <p>Your Ref. : Y13827442</p>
                 <p>Our D/O No. : 123</p>
                 <p>Terms : C.O.D.</p>

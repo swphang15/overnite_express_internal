@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Manifest;
 use App\Models\ShippingRate;
-
+use App\Http\Controllers\Controller;
 class ShippingController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum'); // 所有方法都需要 Token
+    }
     // 获取所有运费
   // 获取唯一的 origin
 public function getUniqueOrigins()
@@ -93,4 +97,48 @@ public function getUniqueDestinations()
             'total_price' => round($total_price, 2) . ' MYR',
         ]);
     }
+    public function update(Request $request, $id)
+{
+    $validated = $request->validate([
+        'origin' => 'required|string|max:3',
+        'destination' => 'required|string|max:3',
+        'minimum_price' => 'required|numeric|min:0',
+        'minimum_weight' => 'required|numeric|min:0',
+        'additional_price_per_kg' => 'required|numeric|min:0',
+    ]);
+
+    $rate = ShippingRate::find($id);
+
+    if (!$rate) {
+        return response()->json(['error' => 'Shipping rate not found'], 404);
+    }
+
+    // 确保新的 origin 和 destination 不会重复已有的记录（但允许更新当前记录）
+    $exists = ShippingRate::where('origin', $validated['origin'])
+                          ->where('destination', $validated['destination'])
+                          ->where('id', '!=', $id)
+                          ->exists();
+
+    if ($exists) {
+        return response()->json(['error' => 'Shipping rate for this route already exists'], 400);
+    }
+
+    $rate->update($validated);
+
+    return response()->json($rate);
+}
+public function destroy($id)
+{
+    $rate = ShippingRate::find($id);
+
+    if (!$rate) {
+        return response()->json(['error' => 'Shipping rate not found'], 404);
+    }
+
+    $rate->delete();
+
+    return response()->json(['message' => 'Shipping rate deleted successfully']);
+}
+
+
 }

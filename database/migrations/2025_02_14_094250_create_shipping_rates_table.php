@@ -19,6 +19,7 @@ return new class extends Migration
         $table->integer('minimum_weight');
         $table->decimal('additional_price_per_kg', 8, 2);
         $table->timestamps();
+        $table->softDeletes(); // 添加 softDeletes 字段
     });
 }
 
@@ -27,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('shipping_rates');
+   
     }
 };
