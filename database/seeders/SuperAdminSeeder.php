@@ -16,10 +16,10 @@ class SuperAdminSeeder extends Seeder
         $superadmin = User::create([
             'name' => 'Super Admin',
             'email' => 'superadmin@example.com',
-            'password' => Hash::make('admin1234'),
+            'password' => bcrypt('admin1234'),
             'role' => 'superadmin',
         ]);
-
+        
         $superadmin->tokens()->delete(); // 清除已有 token
         $token = $superadmin->createToken('superadmin-token')->plainTextToken;
 

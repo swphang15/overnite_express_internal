@@ -5,164 +5,121 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class ClientController extends Controller
 {
-    /**
-     * 获取所有 client
-     */
+    // 保护 API，所有方法都需要 Token 认证
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum');
+    }
+
+    // 获取所有 Clients
     public function index()
     {
-        return response()->json(Client::all());
+        $clients = Client::with('shippingPlan')->get();
+    
+        return response()->json($clients->map(function ($client) {
+            return [
+                'id' => $client->id,
+                'name' => $client->name,
+                'shipping_plan_id' => $client->shipping_plan_id,
+                'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保返回
+                'created_at' => $client->created_at,
+                'updated_at' => $client->updated_at,
+                'deleted_at' => $client->deleted_at,
+            ];
+        }), 200);
+    }
+    
+
+    // 创建新的 Client
+    public function store(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255|unique:clients,name',
+        'shipping_plan_id' => 'required|exists:shipping_plans,id',
+    ]);
+
+    $client = Client::create([
+        'name' => $request->name,
+        'shipping_plan_id' => $request->shipping_plan_id,
+    ]);
+
+    return response()->json($client, 201);
+}
+
+
+public function show($id)
+{
+    $client = Client::with('shippingPlan')->find($id);
+
+    if (!$client) {
+        return response()->json(['message' => 'Client not found'], 404);
     }
 
-    /**
-     * 注册
-     */
-    public function register(Request $request)
-    {
-        try {
-            $request->validate([
-                'company_name' => 'required|string|max:255|unique:clients,company_name',
-                'email'        => 'required|string|email|max:255|unique:clients,email',
-                'password'     => 'required|string|min:6|confirmed',
-            ]);
+    return response()->json([
+        'id' => $client->id,
+        'name' => $client->name,
+        'shipping_plan_id' => $client->shipping_plan_id,
+        'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保 plan_name 正确返回
+        'created_at' => $client->created_at,
+        'updated_at' => $client->updated_at,
+        'deleted_at' => $client->deleted_at,
+    ], 200);
+}
 
-            $client = Client::create([
-                'company_name' => $request->company_name,
-                'email'        => $request->email,
-                'password'     => bcrypt($request->password),
-            ]);
 
-            return response()->json([
-                'message' => 'User registered successfully!',
-                'client'  => $client,
-            ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors'  => $e->errors(),
-            ], 422);
-        }
+    // 更新 Client
+    public function update(Request $request, $id)
+{
+    $client = Client::find($id);
+    if (!$client) {
+        return response()->json(['message' => 'Client not found'], 404);
     }
 
-    /**
-     * 登录
-     */
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string',
-        ]);
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'shipping_plan_id' => 'required|exists:shipping_plans,id',
+    ]);
 
-        // 允许找回软删除账号
-        $client = Client::withTrashed()->where('email', $request->email)->first();
+    $client->update([
+        'name' => $request->name,
+        'shipping_plan_id' => $request->shipping_plan_id,
+    ]);
 
-        // 检查账号是否存在 & 密码是否正确
-        if (!$client || !Hash::check($request->password, $client->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
+    return response()->json($client, 200);
+}
 
-        // 如果账号被软删除，提示账号被停用
-        if ($client->trashed()) {
-            return response()->json(['message' => 'Account has been deactivated'], 403);
-        }
 
-        // 生成 Sanctum token
-        $token = $client->createToken('authToken')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'user'    => $client,
-            'token'   => $token,
-        ]);
-    }
-
-    /**
-     * 获取单个 client (通过 ID)
-     */
-    public function show($id)
+    // 软删除 Client
+    public function destroy($id)
     {
         $client = Client::find($id);
-
         if (!$client) {
             return response()->json(['message' => 'Client not found'], 404);
         }
 
-        return response()->json($client);
+        $client->delete();
+        return response()->json(['message' => 'Client deleted'], 200);
     }
 
-    /**
-     * 获取当前登录用户信息
-     */
-    public function profile()
+    // 获取被软删除的 Clients
+    public function trashed()
     {
-        $client = Auth::user(); // 获取当前登录用户
+        $clients = Client::onlyTrashed()->get();
+        return response()->json($clients, 200);
+    }
 
+    // 恢复被软删除的 Client
+    public function restore($id)
+    {
+        $client = Client::onlyTrashed()->find($id);
         if (!$client) {
-            return response()->json(['message' => 'Unauthorized'], 401);
+            return response()->json(['message' => 'Client not found in trash'], 404);
         }
 
-        return response()->json($client);
-    }
-
-    /**
-     * 更新当前登录用户资料（包括可选更新密码）
-     */
-    public function updateProfile(Request $request)
-    {
-        $client = Auth::user(); // 获取当前登录用户
-
-        $request->validate([
-            'company_name' => 'sometimes|string|max:255|unique:clients,company_name,' . $client->id,
-            'email'        => 'sometimes|email|max:255|unique:clients,email,' . $client->id,
-        ]);
-
-        if ($request->has('company_name')) {
-            $client->company_name = $request->company_name;
-        }
-        if ($request->has('email')) {
-            $client->email = $request->email;
-        }
-
-        $client->save();
-
-        return response()->json([
-            'message' => 'Profile updated successfully!',
-            'client'  => $client,
-        ]);
-    }
-
-    /**
-     * 单独修改密码，需要验证旧密码
-     */
-    public function changePassword(Request $request)
-    {
-        $client = Auth::user();
-
-        if (!$client) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // 要求用户提供旧密码、新密码并确认
-        $request->validate([
-            'current_password' => 'required|string',
-            'password'     => 'required|string|min:6|confirmed',
-            'password_confirmation' => 'required|min:6',
-        ]);
-
-        // 验证旧密码是否正确
-        if (!Hash::check($request->current_password, $client->password)) {
-            return response()->json(['message' => 'Old password is incorrect'], 400);
-        }
-
-        // 更新为新密码
-        $client->password = bcrypt($request->password);
-        $client->save();
-
-        return response()->json(['message' => 'Password changed successfully!']);
+        $client->restore();
+        return response()->json(['message' => 'Client restored'], 200);
     }
 }

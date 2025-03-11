@@ -16,17 +16,22 @@ class AuthController extends Controller
             'email' => 'required|email',
             'password' => 'required',
         ]);
-
+    
         $user = User::where('email', $request->email)->first();
-
+    
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
-
+    
         $token = $user->createToken('auth-token')->plainTextToken;
-
-        return response()->json(['token' => $token, 'role' => $user->role]);
+    
+        return response()->json([
+            'message' => 'Login successful',
+            'token' => $token,
+            'user' => $user, // 返回完整的用户信息
+        ]);
     }
+    
 
 
     // 用户登出
