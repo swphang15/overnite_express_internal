@@ -43,18 +43,19 @@ class UserController extends Controller
         if ($request->user()->role !== 'superadmin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
-
+    
         if ($id) {
             $user = User::find($id);
             if (!$user) {
                 return response()->json(['message' => 'User not found'], 404);
             }
-            return response()->json(['user' => $user]);
+            return response()->json($user); // 直接返回用户对象
         }
-
-        $users = User::where('role', '!=', 'superadmin')->get(); // 过滤 superadmin
-        return response()->json(['users' => $users]);
+    
+        $users = User::where('role', '!=', 'superadmin')->get(); // 获取所有非 superadmin 用户
+        return response()->json($users);
     }
+    
 
     /**
      * 更新用户信息（仅限 superadmin）

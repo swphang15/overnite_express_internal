@@ -125,18 +125,26 @@ class ShippingRateController extends Controller
     {
         $rates = ShippingRate::select('origin', 'destination')->get();
         Log::info($rates);
-
-        // 归类数据，将相同 origin 的 destination 合并为数组
-        $grouped = $rates->groupBy('origin')->map(function ($items) {
+    
+        // Get unique origins
+        $origins = $rates->pluck('origin')->unique()->map(function ($origin) {
             return [
-                'origin' => $items->first()->origin,
-                'destinations' => $items->pluck('destination')->unique()->implode(', ')
+                'id' => (string) $origin,
+                'name' => $origin
             ];
-        });
-
+        })->values()->toArray();
+    
+        // Get unique destinations
+        $destinations = $rates->pluck('destination')->unique()->map(function ($destination) {
+            return [
+                'id' => (string) $destination,
+                'name' => $destination
+            ];
+        })->values()->toArray();
+    
         return response()->json([
-            'origin' => $grouped->keys()->implode(', '),
-            'destinations' => $grouped->pluck('destinations')->implode(', ')
+            'origin' => $origins,
+            'destinations' => $destinations
         ], 200);
     }
 }

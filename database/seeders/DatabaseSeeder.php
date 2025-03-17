@@ -19,7 +19,8 @@ class DatabaseSeeder extends Seeder
        
        
         SuperAdminSeeder::class,
-     
+        ShippingSeeder::class,
+        
      
 
         
