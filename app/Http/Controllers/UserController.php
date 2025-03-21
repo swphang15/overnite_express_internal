@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+
 class UserController extends Controller
 {
     /**
@@ -43,7 +44,7 @@ class UserController extends Controller
         if ($request->user()->role !== 'superadmin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
-    
+
         if ($id) {
             $user = User::find($id);
             if (!$user) {
@@ -51,43 +52,43 @@ class UserController extends Controller
             }
             return response()->json($user); // 直接返回用户对象
         }
-    
+
         $users = User::where('role', '!=', 'superadmin')->get(); // 获取所有非 superadmin 用户
         return response()->json($users);
     }
-    
+
 
     /**
      * 更新用户信息（仅限 superadmin）
      */
     public function updateProfile(Request $request)
-{
-    // 确保用户已登录
-    $user = $request->user();
-    if (!$user) {
-        return response()->json(['message' => 'Unauthorized'], 401);
-    }
+    {
+        // 确保用户已登录
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
-    // 验证 name 和 email（忽略当前用户自己的 email）
-    $validatedData = $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => [
+        // 验证 name 和 email（忽略当前用户自己的 email）
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
                 'required',
                 'email',
                 Rule::unique('users', 'email')->ignore($user->id)
             ],
-    ], [
-        'name.required' => 'Name is required.',
-        'email.required' => 'Email is required.',
-        'email.email' => 'Invalid email format.',
-        'email.unique' => 'This email is already in use.',
-    ]);
+        ], [
+            'name.required' => 'Name is required.',
+            'email.required' => 'Email is required.',
+            'email.email' => 'Invalid email format.',
+            'email.unique' => 'This email is already in use.',
+        ]);
 
-    // 更新用户信息
-    $user->update($validatedData);
+        // 更新用户信息
+        $user->update($validatedData);
 
-    return response()->json(['message' => 'Profile updated successfully.', 'user' => $user]);
-}
+        return response()->json(['message' => 'Profile updated successfully.', 'user' => $user]);
+    }
 
     /**
      * 更新密码
@@ -125,7 +126,7 @@ class UserController extends Controller
     }
 
 
-    
+
 
     /**
      * 删除用户（仅限 superadmin）

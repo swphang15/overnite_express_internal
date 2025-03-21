@@ -18,7 +18,7 @@ class ClientController extends Controller
     public function index()
     {
         $clients = Client::with('shippingPlan')->get();
-    
+
         return response()->json($clients->map(function ($client) {
             return [
                 'id' => $client->id,
@@ -31,65 +31,65 @@ class ClientController extends Controller
             ];
         }), 200);
     }
-    
+
 
     // 创建新的 Client
     public function store(Request $request)
-{
-    $request->validate([
-        'name' => 'required|string|max:255|unique:clients,name',
-        'shipping_plan_id' => 'required|exists:shipping_plans,id',
-    ]);
+    {
+        $request->validate([
+            'name' => 'required|string|max:255|unique:clients,name',
+            'shipping_plan_id' => 'required|exists:shipping_plans,id',
+        ]);
 
-    $client = Client::create([
-        'name' => $request->name,
-        'shipping_plan_id' => $request->shipping_plan_id,
-    ]);
+        $client = Client::create([
+            'name' => $request->name,
+            'shipping_plan_id' => $request->shipping_plan_id,
+        ]);
 
-    return response()->json($client, 201);
-}
-
-
-public function show($id)
-{
-    $client = Client::with('shippingPlan')->find($id);
-
-    if (!$client) {
-        return response()->json(['message' => 'Client not found'], 404);
+        return response()->json($client, 201);
     }
 
-    return response()->json([
-        'id' => $client->id,
-        'name' => $client->name,
-        'shipping_plan_id' => $client->shipping_plan_id,
-        'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保 plan_name 正确返回
-        'created_at' => $client->created_at,
-        'updated_at' => $client->updated_at,
-        'deleted_at' => $client->deleted_at,
-    ], 200);
-}
+
+    public function show($id)
+    {
+        $client = Client::with('shippingPlan')->find($id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        return response()->json([
+            'id' => $client->id,
+            'name' => $client->name,
+            'shipping_plan_id' => $client->shipping_plan_id,
+            'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保 plan_name 正确返回
+            'created_at' => $client->created_at,
+            'updated_at' => $client->updated_at,
+            'deleted_at' => $client->deleted_at,
+        ], 200);
+    }
 
 
     // 更新 Client
     public function update(Request $request, $id)
-{
-    $client = Client::find($id);
-    if (!$client) {
-        return response()->json(['message' => 'Client not found'], 404);
+    {
+        $client = Client::find($id);
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'shipping_plan_id' => 'required|exists:shipping_plans,id',
+        ]);
+
+        $client->update([
+            'name' => $request->name,
+            'shipping_plan_id' => $request->shipping_plan_id,
+        ]);
+
+        return response()->json($client, 200);
     }
-
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'shipping_plan_id' => 'required|exists:shipping_plans,id',
-    ]);
-
-    $client->update([
-        'name' => $request->name,
-        'shipping_plan_id' => $request->shipping_plan_id,
-    ]);
-
-    return response()->json($client, 200);
-}
 
 
     // 软删除 Client

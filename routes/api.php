@@ -22,11 +22,10 @@ Route::get('dashboard/count', [StatsController::class, 'getCounts']);
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/users', [UserController::class, 'createUser']); 
-    Route::get('/users/{id?}', [UserController::class, 'readUser']); 
+    Route::post('/users', [UserController::class, 'createUser']);
+    Route::get('/users/{id?}', [UserController::class, 'readUser']);
     // Route::put('/users', [UserController::class, 'updateProfile'])->middleware('auth:sanctum');
-
-    Route::delete('/users/{id}', [UserController::class, 'deleteUser']); 
+    Route::delete('/users/{id}', [UserController::class, 'deleteUser']);
 });
 Route::middleware('auth:sanctum')->put('/users/profile', [UserController::class, 'updateProfile']);
 Route::middleware('auth:sanctum')->put('/users/password', [UserController::class, 'updatePassword']);
@@ -34,25 +33,23 @@ Route::middleware('auth:sanctum')->put('/users/password', [UserController::class
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/clients', [ClientController::class, 'index']); 
-    Route::post('/clients', [ClientController::class, 'store']); 
-    Route::get('/clients/{id}', [ClientController::class, 'show']); 
-    Route::put('/clients/{id}', [ClientController::class, 'update']); 
-    Route::delete('/clients/{id}', [ClientController::class, 'destroy']); 
-    Route::get('/clients/trashed', [ClientController::class, 'trashed']); 
-    Route::post('/clients/restore/{id}', [ClientController::class, 'restore']); 
+    Route::get('/clients', [ClientController::class, 'index']);
+    Route::post('/clients', [ClientController::class, 'store']);
+    Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::put('/clients/{id}', [ClientController::class, 'update']);
+    Route::delete('/clients/{id}', [ClientController::class, 'destroy']);
+    Route::get('/clients/trashed', [ClientController::class, 'trashed']);
+    Route::post('/clients/restore/{id}', [ClientController::class, 'restore']);
 });
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/shipping-plans', [ShippingPlanController::class, 'index']); 
+    Route::get('/shipping-plans', [ShippingPlanController::class, 'index']);
     Route::post('/shipping-plan-rates', [ShippingController::class, 'store']);
     Route::get('/shipping-plans/{id}', [ShippingController::class, 'show']);
     Route::put('/shipping-plans/{id}', [ShippingController::class, 'update']); // 更新
     Route::delete('/shipping-plan/{id}', [ShippingController::class, 'deleteShippingPlan']);
     Route::delete('/shipping-rate/{id}', [ShippingController::class, 'deleteShippingRate']);
-
-
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -70,21 +67,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
-
-
 });
 
 
 
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/shipping-rates', [ShippingRateController::class, 'index']); 
-    Route::post('/shipping-rates', [ShippingRateController::class, 'store']); 
+    Route::get('/shipping-rates', [ShippingRateController::class, 'index']);
+    Route::post('/shipping-rates', [ShippingRateController::class, 'store']);
     Route::get('/shipping-rates/unique', [ShippingRateController::class, 'OAD']);
-    Route::get('/shipping-rates/{id}', [ShippingRateController::class, 'show']); 
-    Route::put('/shipping-rates/{id}', [ShippingRateController::class, 'update']); 
-    Route::delete('/shipping-rates/{id}', [ShippingRateController::class, 'destroy']); 
-    Route::get('/shipping-rates/trashed', [ShippingRateController::class, 'trashed']); 
+    Route::get('/shipping-rates/{id}', [ShippingRateController::class, 'show']);
+    Route::put('/shipping-rates/{id}', [ShippingRateController::class, 'update']);
+    Route::delete('/shipping-rates/{id}', [ShippingRateController::class, 'destroy']);
+    Route::get('/shipping-rates/trashed', [ShippingRateController::class, 'trashed']);
     Route::post('/shipping-rates/restore/{id}', [ShippingRateController::class, 'restore']);
 });
 
@@ -123,11 +118,11 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 // Route::middleware('auth:sanctum')->group(function () {
-  
-//     // // Route::post('/shipping-plans', [ShippingPlanController::class, 'store']); 
-//     // Route::get('/shipping-plans/{id}', [ShippingPlanController::class, 'show']); 
-//     Route::put('/shipping-plans/{id}', [ShippingPlanController::class, 'update']); 
-//     Route::delete('/shipping-plans/{id}', [ShippingPlanController::class, 'destroy']); 
-//     Route::get('/shipping-plans/trashed', [ShippingPlanController::class, 'trashed']); 
-//     Route::post('/shipping-plans/restore/{id}', [ShippingPlanController::class, 'restore']); 
+
+//     // // Route::post('/shipping-plans', [ShippingPlanController::class, 'store']);
+//     // Route::get('/shipping-plans/{id}', [ShippingPlanController::class, 'show']);
+//     Route::put('/shipping-plans/{id}', [ShippingPlanController::class, 'update']);
+//     Route::delete('/shipping-plans/{id}', [ShippingPlanController::class, 'destroy']);
+//     Route::get('/shipping-plans/trashed', [ShippingPlanController::class, 'trashed']);
+//     Route::post('/shipping-plans/restore/{id}', [ShippingPlanController::class, 'restore']);
 // });

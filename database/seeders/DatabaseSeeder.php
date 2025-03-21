@@ -14,18 +14,18 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void
-{
-    $this->call([
-       
-       
-        SuperAdminSeeder::class,
-        ShippingSeeder::class,
-        
-     
+    {
+        $this->call([
 
-        
 
-    ]);
-}
+            SuperAdminSeeder::class,
+            ShippingSeeder::class,
+            ClientsTableSeeder::class,
 
+
+
+
+
+        ]);
+    }
 }

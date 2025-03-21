@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ManifestExport;
 use Exception;
+
 class ManifestController extends Controller
 {
 
@@ -20,7 +22,7 @@ class ManifestController extends Controller
         $export = new ManifestExport();
         return $export->exportPdf($manifestId);
     }
-    
+
     public function store(Request $request)
     {
         try {
@@ -32,7 +34,7 @@ class ManifestController extends Controller
                 'to' => 'required_without:manifest_info_id|string',
                 'from' => 'required_without:manifest_info_id|string',
                 'flt' => 'nullable|string',
-    
+
                 'lists' => 'required|array|min:1',
                 'lists.*.consignor_id' => 'required|exists:clients,id',
                 'lists.*.consignee_name' => 'required|string',
@@ -44,11 +46,11 @@ class ManifestController extends Controller
                 'lists.*.origin' => 'required|string',
                 'lists.*.remarks' => 'nullable|string',
             ]);
-    
+
             // 2️⃣ 计算 `manifest_no`
             $maxManifestNo = ManifestInfo::withTrashed()->max('manifest_no'); // 包含软删除的最大值
             $nextManifestNo = $this->getNextManifestNo($maxManifestNo); // 找到下一个可用的编号
-    
+
             // 3️⃣ 创建或获取 ManifestInfo
             if (!isset($validatedData['manifest_info_id'])) {
                 $manifestInfo = ManifestInfo::create([
@@ -62,13 +64,13 @@ class ManifestController extends Controller
             } else {
                 $manifestInfo = ManifestInfo::findOrFail($validatedData['manifest_info_id']);
             }
-    
+
             // 4️⃣ 批量创建 ManifestList
             $manifestLists = [];
             foreach ($validatedData['lists'] as $index => $list) {
                 $fullKg = floor($list['kg']);
                 $grams = ($list['kg'] - $fullKg) * 1000;
-    
+
                 // 计算 total_price
                 $totalPrice = $this->calculateTotalPrice(
                     $manifestInfo->from,
@@ -76,7 +78,7 @@ class ManifestController extends Controller
                     $list['consignor_id'],
                     $list['kg']
                 );
-    
+
                 $manifestLists[] = ManifestList::create([
                     'manifest_info_id' => $manifestInfo->id,
                     'manifest_no' => $nextManifestNo + $index, // 确保 manifest_no 递增
@@ -92,13 +94,12 @@ class ManifestController extends Controller
                     'remarks' => $list['remarks'] ?? null,
                 ]);
             }
-    
+
             return response()->json([
                 'message' => 'Manifest created successfully',
                 'manifest_info' => $manifestInfo,
                 'manifest_list' => $manifestLists
             ], 201);
-    
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'Validation failed',
@@ -112,267 +113,265 @@ class ManifestController extends Controller
         }
     }
     private function getNextManifestNo($maxManifestNo)
-{
-    // 检查是否有删除的空缺编号
-    $missingNo = DB::table('manifest_infos as m1')
-        ->leftJoin('manifest_infos as m2', 'm1.manifest_no', '=', DB::raw('m2.manifest_no - 1'))
-        ->whereNull('m2.manifest_no')
-        ->orderBy('m1.manifest_no')
-        ->value('m1.manifest_no');
+    {
+        // 检查是否有删除的空缺编号
+        $missingNo = DB::table('manifest_infos as m1')
+            ->leftJoin('manifest_infos as m2', 'm1.manifest_no', '=', DB::raw('m2.manifest_no - 1'))
+            ->whereNull('m2.manifest_no')
+            ->orderBy('m1.manifest_no')
+            ->value('m1.manifest_no');
 
-    // 如果找到空缺编号，就用这个，否则用 `maxManifestNo + 1`
-    return $missingNo ? $missingNo + 1 : ($maxManifestNo + 1 ?? 1001);
-}
-
-    
-public function index()
-{
-    try {
-        $manifests = ManifestInfo::with('user:id,name')->get();
-
-        return response()->json($manifests->map(function ($manifest) {
-            return [
-                'id' => $manifest->id,
-                'date' => $manifest->date,
-                'awb_no' => $manifest->awb_no,
-                'to' => $manifest->to,
-                'from' => $manifest->from,
-                'flt' => $manifest->flt,
-                'manifest_no' => $manifest->manifest_no,
-                'user_id' => $manifest->user_id,
-                'created_by' => $manifest->user ? $manifest->user->name : null, // ✅ 获取用户名
-            ];
-        }), 200);
-    } catch (Exception $e) {
-        return response()->json([
-            'message' => 'Failed to retrieve manifests',
-            'error' => $e->getMessage()
-        ], 500);
+        // 如果找到空缺编号，就用这个，否则用 `maxManifestNo + 1`
+        return $missingNo ? $missingNo + 1 : ($maxManifestNo + 1 ?? 1001);
     }
-}
 
 
-public function show($id)
-{
-    try {
-        // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
-        $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
+    public function index()
+    {
+        try {
+            $manifests = ManifestInfo::with('user:id,name')->get();
 
-        // 修改 manifest_lists，将 kg 和 gram 合并，并调整 consignor_name 的位置
-        $manifestInfo->manifestLists->transform(function ($item) {
-            $item->kg = $item->kg + ($item->gram / 1000);
-            unset($item->gram); // 移除 gram 字段
-            
-            // 重新构建 JSON 结构，确保 consignor_name 在 consignor_id 下面
-            return [
-                'id' => $item->id,
-                'manifest_info_id' => $item->manifest_info_id,
-                'consignor_id' => $item->consignor_id,
-                'consignor_name' => $item->client->name ?? null, // 这里确保 consignor_name 在 consignor_id 下面
-                'consignee_name' => $item->consignee_name,
-                'cn_no' => $item->cn_no,
-                'pcs' => $item->pcs,
-                'kg' => $item->kg,
-                'remarks' => $item->remarks,
-                'total_price' => $item->total_price,
-                'discount' => $item->discount,
-                'origin' => $item->origin,
-                'created_at' => $item->created_at,
-                'updated_at' => $item->updated_at,
-                'deleted_at' => $item->deleted_at
-            ];
-        });
-
-        return response()->json($manifestInfo, 200);
-
-    } catch (ModelNotFoundException $e) {
-        return response()->json([
-            'message' => 'Manifest not found'
-        ], 404);
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Something went wrong',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-}
-
-
-public function update(Request $request, $id)
-{
-    try {
-        // 📝 验证请求数据
-        $validatedData = $request->validate([
-            'date' => 'required|date',
-            'awb_no' => 'required|string|unique:manifest_infos,awb_no,' . $id,
-            'to' => 'required|string',
-            'from' => 'required|string',
-            'flt' => 'nullable|string',
-
-            'manifest_lists' => 'required|array|min:1',
-            'manifest_lists.*.id' => 'nullable|exists:manifest_lists,id',
-            'manifest_lists.*.consignor_id' => 'required|exists:clients,id',
-            'manifest_lists.*.consignee_name' => 'required|string',
-            'manifest_lists.*.cn_no' => [
-                'required',
-                'numeric',
-                function ($attribute, $value, $fail) use ($request, $id) {
-                    $listIndex = explode('.', $attribute)[1]; 
-                    $listId = $request->input("manifest_lists.$listIndex.id");
-
-                    if ($listId) {
-                        // If updating an existing record, check excluding itself
-                        $exists = ManifestList::where('cn_no', $value)
-                            ->where('id', '!=', $listId)
-                            ->exists();
-                    } else {
-                        // If creating a new record, check only within the same manifest
-                        $exists = ManifestList::where('cn_no', $value)
-                            ->where('manifest_info_id', $id) // Only check within the same manifest
-                            ->exists();
-                    }
-
-                    if ($exists) {
-                        $fail('The ' . $attribute . ' has already been taken.');
-                    }
-                }
-            ],
-            'manifest_lists.*.pcs' => 'required|integer|min:1',
-            'manifest_lists.*.kg' => 'required|numeric|min:0',
-            'manifest_lists.*.origin' => 'required|string',
-            'manifest_lists.*.remarks' => 'nullable|string',
-        ]);
-
-        // ✨ 查找 ManifestInfo
-        $manifestInfo = ManifestInfo::findOrFail($id);
-
-        // ✏️ 更新 ManifestInfo
-        $manifestInfo->update([
-            'date' => $validatedData['date'],
-            'awb_no' => $validatedData['awb_no'],
-            'to' => $validatedData['to'],
-            'from' => $validatedData['from'],
-            'flt' => $validatedData['flt'],
-        ]);
-
-        // 🚀 处理 ManifestLists 的更新
-        foreach ($validatedData['manifest_lists'] as $list) {
-            if (isset($list['id'])) {
-                // ✅ 更新现有的 ManifestList
-                $manifestList = ManifestList::findOrFail($list['id']);
-                $manifestList->update([
-                    'consignor_id' => $list['consignor_id'],
-                    'consignee_name' => $list['consignee_name'],
-                    'cn_no' => $list['cn_no'],
-                    'pcs' => $list['pcs'],
-                    'kg' => floor($list['kg']),
-                    'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
-                    'origin' => $list['origin'],
-                    'remarks' => $list['remarks'] ?? null,
-                    'total_price' => $this->calculateTotalPrice(
-                        $manifestInfo->from,
-                        $manifestInfo->to,
-                        $list['consignor_id'],
-                        $list['kg']
-                    ),
-                ]);
-            } else {
-                // ➕ 创建新的 ManifestList
-                ManifestList::create([
-                    'manifest_info_id' => $manifestInfo->id,
-                    'manifest_no' => $manifestInfo->manifest_no,
-                    'consignor_id' => $list['consignor_id'],
-                    'consignee_name' => $list['consignee_name'],
-                    'cn_no' => $list['cn_no'],
-                    'pcs' => $list['pcs'],
-                    'kg' => floor($list['kg']),
-                    'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
-                    'origin' => $list['origin'],
-                    'remarks' => $list['remarks'] ?? null,
-                    'total_price' => $this->calculateTotalPrice(
-                        $manifestInfo->from,
-                        $manifestInfo->to,
-                        $list['consignor_id'],
-                        $list['kg']
-                    ),
-                ]);
-            }
+            return response()->json($manifests->map(function ($manifest) {
+                return [
+                    'id' => $manifest->id,
+                    'date' => $manifest->date,
+                    'awb_no' => $manifest->awb_no,
+                    'to' => $manifest->to,
+                    'from' => $manifest->from,
+                    'flt' => $manifest->flt,
+                    'manifest_no' => $manifest->manifest_no,
+                    'user_id' => $manifest->user_id,
+                    'created_by' => $manifest->user ? $manifest->user->name : null, // ✅ 获取用户名
+                ];
+            }), 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to retrieve manifests',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'message' => 'Manifest updated successfully',
-            'manifest_info' => $manifestInfo->load('manifestLists')
-        ], 200);
-
-    } catch (ValidationException $e) {
-        return response()->json([
-            'message' => 'Validation failed',
-            'errors' => $e->errors()
-        ], 422);
-    } catch (Exception $e) {
-        return response()->json([
-            'message' => 'Something went wrong',
-            'error' => $e->getMessage()
-        ], 500);
     }
-    return response()->json(['data' => $request->all()], 200);
-}
 
 
-public function destroy($id)
-{
-    try {
-        // 查找 ManifestInfo
-        $manifestInfo = ManifestInfo::findOrFail($id);
+    public function show($id)
+    {
+        try {
+            // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
+            $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
 
-        // 级联删除所有 ManifestList
-        $manifestInfo->manifestLists()->delete();
+            // 修改 manifest_lists，将 kg 和 gram 合并，并调整 consignor_name 的位置
+            $manifestInfo->manifestLists->transform(function ($item) {
+                $item->kg = $item->kg + ($item->gram / 1000);
+                unset($item->gram); // 移除 gram 字段
 
-        // 删除 ManifestInfo
-        $manifestInfo->delete();
+                // 重新构建 JSON 结构，确保 consignor_name 在 consignor_id 下面
+                return [
+                    'id' => $item->id,
+                    'manifest_info_id' => $item->manifest_info_id,
+                    'consignor_id' => $item->consignor_id,
+                    'consignor_name' => $item->client->name ?? null, // 这里确保 consignor_name 在 consignor_id 下面
+                    'consignee_name' => $item->consignee_name,
+                    'cn_no' => $item->cn_no,
+                    'pcs' => $item->pcs,
+                    'kg' => $item->kg,
+                    'remarks' => $item->remarks,
+                    'total_price' => $item->total_price,
+                    'discount' => $item->discount,
+                    'origin' => $item->origin,
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                    'deleted_at' => $item->deleted_at
+                ];
+            });
 
-        return response()->json([
-            'message' => 'ManifestInfo and its lists deleted successfully'
-        ], 200);
-    } catch (ModelNotFoundException $e) {
-        return response()->json([
-            'message' => 'Manifest not found'
-        ], 404);
-    } catch (Exception $e) {
-        return response()->json([
-            'message' => 'Something went wrong',
-            'error' => $e->getMessage()
-        ], 500);
+            return response()->json($manifestInfo, 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Manifest not found'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
-}
-public function destroyManifestList($id)
-{
-    try {
-        // 查找 ManifestList
-        $manifestList = ManifestList::findOrFail($id);
 
-        // 删除 ManifestList
-        $manifestList->delete();
 
-        return response()->json([
-            'message' => 'Manifest list deleted successfully'
-        ], 200);
-    } catch (ModelNotFoundException $e) {
-        return response()->json([
-            'message' => 'Manifest list not found'
-        ], 404);
-    } catch (Exception $e) {
-        return response()->json([
-            'message' => 'Something went wrong',
-            'error' => $e->getMessage()
-        ], 500);
+    public function update(Request $request, $id)
+    {
+        try {
+            // 📝 验证请求数据
+            $validatedData = $request->validate([
+                'date' => 'required|date',
+                'awb_no' => 'required|string|unique:manifest_infos,awb_no,' . $id,
+                'to' => 'required|string',
+                'from' => 'required|string',
+                'flt' => 'nullable|string',
+
+                'manifest_lists' => 'required|array|min:1',
+                'manifest_lists.*.id' => 'nullable|exists:manifest_lists,id',
+                'manifest_lists.*.consignor_id' => 'required|exists:clients,id',
+                'manifest_lists.*.consignee_name' => 'required|string',
+                'manifest_lists.*.cn_no' => [
+                    'required',
+                    'numeric',
+                    function ($attribute, $value, $fail) use ($request, $id) {
+                        $listIndex = explode('.', $attribute)[1];
+                        $listId = $request->input("manifest_lists.$listIndex.id");
+
+                        if ($listId) {
+                            // If updating an existing record, check excluding itself
+                            $exists = ManifestList::where('cn_no', $value)
+                                ->where('id', '!=', $listId)
+                                ->exists();
+                        } else {
+                            // If creating a new record, check only within the same manifest
+                            $exists = ManifestList::where('cn_no', $value)
+                                ->where('manifest_info_id', $id) // Only check within the same manifest
+                                ->exists();
+                        }
+
+                        if ($exists) {
+                            $fail('The ' . $attribute . ' has already been taken.');
+                        }
+                    }
+                ],
+                'manifest_lists.*.pcs' => 'required|integer|min:1',
+                'manifest_lists.*.kg' => 'required|numeric|min:0',
+                'manifest_lists.*.origin' => 'required|string',
+                'manifest_lists.*.remarks' => 'nullable|string',
+            ]);
+
+            // ✨ 查找 ManifestInfo
+            $manifestInfo = ManifestInfo::findOrFail($id);
+
+            // ✏️ 更新 ManifestInfo
+            $manifestInfo->update([
+                'date' => $validatedData['date'],
+                'awb_no' => $validatedData['awb_no'],
+                'to' => $validatedData['to'],
+                'from' => $validatedData['from'],
+                'flt' => $validatedData['flt'],
+            ]);
+
+            // 🚀 处理 ManifestLists 的更新
+            foreach ($validatedData['manifest_lists'] as $list) {
+                if (isset($list['id'])) {
+                    // ✅ 更新现有的 ManifestList
+                    $manifestList = ManifestList::findOrFail($list['id']);
+                    $manifestList->update([
+                        'consignor_id' => $list['consignor_id'],
+                        'consignee_name' => $list['consignee_name'],
+                        'cn_no' => $list['cn_no'],
+                        'pcs' => $list['pcs'],
+                        'kg' => floor($list['kg']),
+                        'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
+                        'origin' => $list['origin'],
+                        'remarks' => $list['remarks'] ?? null,
+                        'total_price' => $this->calculateTotalPrice(
+                            $manifestInfo->from,
+                            $manifestInfo->to,
+                            $list['consignor_id'],
+                            $list['kg']
+                        ),
+                    ]);
+                } else {
+                    // ➕ 创建新的 ManifestList
+                    ManifestList::create([
+                        'manifest_info_id' => $manifestInfo->id,
+                        'manifest_no' => $manifestInfo->manifest_no,
+                        'consignor_id' => $list['consignor_id'],
+                        'consignee_name' => $list['consignee_name'],
+                        'cn_no' => $list['cn_no'],
+                        'pcs' => $list['pcs'],
+                        'kg' => floor($list['kg']),
+                        'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
+                        'origin' => $list['origin'],
+                        'remarks' => $list['remarks'] ?? null,
+                        'total_price' => $this->calculateTotalPrice(
+                            $manifestInfo->from,
+                            $manifestInfo->to,
+                            $list['consignor_id'],
+                            $list['kg']
+                        ),
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Manifest updated successfully',
+                'manifest_info' => $manifestInfo->load('manifestLists')
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+        return response()->json(['data' => $request->all()], 200);
     }
-}
+
+
+    public function destroy($id)
+    {
+        try {
+            // 查找 ManifestInfo
+            $manifestInfo = ManifestInfo::findOrFail($id);
+
+            // 级联删除所有 ManifestList
+            $manifestInfo->manifestLists()->delete();
+
+            // 删除 ManifestInfo
+            $manifestInfo->delete();
+
+            return response()->json([
+                'message' => 'ManifestInfo and its lists deleted successfully'
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Manifest not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function destroyManifestList($id)
+    {
+        try {
+            // 查找 ManifestList
+            $manifestList = ManifestList::findOrFail($id);
+
+            // 删除 ManifestList
+            $manifestList->delete();
+
+            return response()->json([
+                'message' => 'Manifest list deleted successfully'
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Manifest list not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 
 
 
-    
+
     /**
      * 计算 total_price
      */
@@ -383,26 +382,26 @@ public function destroyManifestList($id)
         if (!$client) {
             throw new Exception("Consignor not found.");
         }
-    
+
         // 2️⃣ 获取 shipping_rate
         $shippingRate = ShippingRate::where('origin', $from)
             ->where('destination', $to)
             ->where('shipping_plan_id', $client->shipping_plan_id)
             ->first();
-    
+
         if (!$shippingRate) {
             throw new Exception("Shipping rate not found.");
         }
-    
+
         // 3️⃣ 计算运费
         if ($kg <= $shippingRate->minimum_weight) {
             return (float) $shippingRate->minimum_price;
         }
-    
+
         // 计算额外重量费用
         $extraWeight = $kg - $shippingRate->minimum_weight;
         $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
-    
+
         return (float) ($shippingRate->minimum_price + $extraCost);
     }
 }
@@ -617,24 +616,24 @@ public function destroyManifestList($id)
 //             'manifest_no' => 'sometimes|integer',
 //             'discount' => 'nullable|numeric|min:0|max:100',
 //         ]);
-    
+
 //         $manifest_data = [
 //             'manifest_number' => $manifest->manifest_number,
 //         ];
-    
+
 //         // // 处理 Consignor
 //         // if ($request->has('consignor')) {
 //         //     $consignor = is_numeric($request->input('consignor'))
 //         //         ? Client::find($request->input('consignor'))
 //         //         : Client::firstOrCreate(['name' => $request->input('consignor')]);
-    
+
 //         //     if ($consignor) {
 //         //         $manifest->consignor_id = $consignor->id;
 //         //     } else {
 //         //         return response()->json(['error' => 'Invalid consignor'], 400);
 //         //     }
 //         // }
-    
+
 //         // 处理 Consignee 和其他字段
 //         if ($request->has('consignee')) {
 //             $manifest_data['consignee'] = $request->consignee;
@@ -676,9 +675,9 @@ public function destroyManifestList($id)
 //         if ($request->has('manifest_no')) {
 //             $manifest_data['manifest_no'] = $request->manifest_no;
 //         }
-        
 
-    
+
+
 //         // 计算新价格
 //         if ($request->hasAny(['kg', 'gram', 'discount', 'from', 'to'])) {
 //             $kg = $request->input('kg', $manifest->kg);
@@ -686,12 +685,12 @@ public function destroyManifestList($id)
 //             $discount = $request->input('discount', $manifest->discount);
 //             $origin = $request->input('from', $manifest->from);
 //             $destination = $request->input('to', $manifest->to);
-            
-    
+
+
 //             $shippingRate = ShippingRate::where('origin', $origin)
 //                 ->where('destination', $destination)
 //                 ->first();
-    
+
 //             if ($shippingRate) {
 //                 $total_weight = $kg + ($gram / 1000);
 //                 if ($total_weight <= $shippingRate->minimum_weight) {
@@ -700,17 +699,17 @@ public function destroyManifestList($id)
 //                     $extra_kg = $total_weight - $shippingRate->minimum_weight;
 //                     $total_price = $shippingRate->minimum_price + ($extra_kg * $shippingRate->additional_price_per_kg);
 //                 }
-    
+
 //                 $total_price_after_discount = $total_price * (1 - ($discount / 100));
 //                 $manifest_data['total_price'] = $total_price_after_discount;
 //                 $manifest_data['discount'] = $discount;
 //             }
 //         }
-    
+
 //         // 批量更新字段
 //         $manifest->fill($manifest_data);
 //         $manifest->save();
-    
+
 //         return response()->json($manifest->load('consignor'));
 //     }
 

@@ -22,17 +22,17 @@ class ShippingPlanController extends Controller
 
     // 创建新的 Shipping Plan
     public function store(Request $request)
-{
-    $request->validate([
-        'plan_name' => 'required|string|max:255|unique:shipping_plans,plan_name',
-    ]);
+    {
+        $request->validate([
+            'plan_name' => 'required|string|max:255|unique:shipping_plans,plan_name',
+        ]);
 
-    $plan = ShippingPlan::create([
-        'plan_name' => $request->plan_name,
-    ]);
+        $plan = ShippingPlan::create([
+            'plan_name' => $request->plan_name,
+        ]);
 
-    return response()->json($plan, 201);
-}
+        return response()->json($plan, 201);
+    }
 
 
     // 获取单个 Shipping Plan
@@ -48,22 +48,22 @@ class ShippingPlanController extends Controller
 
     // 更新 Shipping Plan
     public function update(Request $request, $id)
-{
-    $plan = ShippingPlan::find($id);
-    if (!$plan) {
-        return response()->json(['message' => 'Shipping Plan not found'], 404);
+    {
+        $plan = ShippingPlan::find($id);
+        if (!$plan) {
+            return response()->json(['message' => 'Shipping Plan not found'], 404);
+        }
+
+        $request->validate([
+            'plan_name' => "required|string|max:255|unique:shipping_plans,plan_name,{$id}",
+        ]);
+
+        $plan->update([
+            'plan_name' => $request->plan_name,
+        ]);
+
+        return response()->json($plan, 200);
     }
-
-    $request->validate([
-        'plan_name' => "required|string|max:255|unique:shipping_plans,plan_name,{$id}",
-    ]);
-
-    $plan->update([
-        'plan_name' => $request->plan_name,
-    ]);
-
-    return response()->json($plan, 200);
-}
 
 
     // 软删除 Shipping Plan

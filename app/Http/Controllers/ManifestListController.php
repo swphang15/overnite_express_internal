@@ -28,11 +28,11 @@ class ManifestListController extends Controller
             'origin' => 'required|string',
             'remarks' => 'nullable|string',
         ]);
-    
+
         // 拆分 kg
         $fullKg = floor($request->kg); // 取整数部分
         $grams = ($request->kg - $fullKg) * 1000; // 计算克数
-    
+
         $manifestList = ManifestList::create([
             'manifest_info_id' => $request->manifest_info_id,
             'consignor_id' => $request->consignor_id,
@@ -46,10 +46,10 @@ class ManifestListController extends Controller
             'origin' => $request->origin,
             'remarks' => $request->remarks
         ]);
-    
+
         return response()->json($manifestList, 201);
     }
-    
+
 
     // 获取单个清单项
     public function show($id)

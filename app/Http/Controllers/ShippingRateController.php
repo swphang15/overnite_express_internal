@@ -6,6 +6,7 @@ use App\Models\ShippingRate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+
 class ShippingRateController extends Controller
 {
 
@@ -125,7 +126,7 @@ class ShippingRateController extends Controller
     {
         $rates = ShippingRate::select('origin', 'destination')->get();
         Log::info($rates);
-    
+
         // Get unique origins
         $origins = $rates->pluck('origin')->unique()->map(function ($origin) {
             return [
@@ -133,7 +134,7 @@ class ShippingRateController extends Controller
                 'name' => $origin
             ];
         })->values()->toArray();
-    
+
         // Get unique destinations
         $destinations = $rates->pluck('destination')->unique()->map(function ($destination) {
             return [
@@ -141,7 +142,7 @@ class ShippingRateController extends Controller
                 'name' => $destination
             ];
         })->values()->toArray();
-    
+
         return response()->json([
             'origin' => $origins,
             'destinations' => $destinations
