@@ -8,17 +8,18 @@ use App\Models\ManifestList;
 
 class ManifestExport
 {
-    public function exportPdf($manifestNo)
+    public function exportPdf($manifestId)
     {
-        // 1️⃣ 获取 Manifest 数据
-        $manifestInfo = ManifestInfo::where('manifest_no', $manifestNo)->firstOrFail();
+        // 1️⃣ 获取 Manifest 数据（用 id 查询）
+        $manifestInfo = ManifestInfo::findOrFail($manifestId);
         $manifestLists = ManifestList::where('manifest_info_id', $manifestInfo->id)->get();
-
+    
         // 2️⃣ 生成 PDF
         $pdf = Pdf::loadView('pdf.manifest', compact('manifestInfo', 'manifestLists'))->setPaper('A4', 'portrait');
-
-        return $pdf->stream("Manifest_{$manifestNo}.pdf");
+    
+        return $pdf->download("Manifest_{$manifestInfo->id}.pdf");
     }
+    
 }
 
 // namespace App\Exports;

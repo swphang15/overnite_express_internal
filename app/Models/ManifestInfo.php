@@ -19,12 +19,18 @@ class ManifestInfo extends Model
         'from',
         'flt',
         'manifest_no',
+        'user_id', // 加上 user_id
     ];
+    
 
     public function manifestLists(): HasMany
     {
         return $this->hasMany(ManifestList::class);
     }
-
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+    
 
 }

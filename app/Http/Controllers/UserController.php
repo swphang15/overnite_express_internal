@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-
+use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
     /**
@@ -60,53 +60,72 @@ class UserController extends Controller
     /**
      * 更新用户信息（仅限 superadmin）
      */
-    public function updateUser(Request $request, $id)
+    public function updateProfile(Request $request)
+{
+    // 确保用户已登录
+    $user = $request->user();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthorized'], 401);
+    }
+
+    // 验证 name 和 email（忽略当前用户自己的 email）
+    $validatedData = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->ignore($user->id)
+            ],
+    ], [
+        'name.required' => 'Name is required.',
+        'email.required' => 'Email is required.',
+        'email.email' => 'Invalid email format.',
+        'email.unique' => 'This email is already in use.',
+    ]);
+
+    // 更新用户信息
+    $user->update($validatedData);
+
+    return response()->json(['message' => 'Profile updated successfully.', 'user' => $user]);
+}
+
+    /**
+     * 更新密码
+     */
+    public function updatePassword(Request $request)
     {
-        // 获取当前登录的用户
-        $currentUser = $request->user();
-
-        // 确保当前用户是 superadmin
-        if ($currentUser->role !== 'superadmin') {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        // 查找要修改的用户
-        $user = User::find($id);
+        // 确保用户已登录
+        $user = $request->user();
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // 防止修改 superadmin
-        if ($user->role === 'superadmin') {
-            return response()->json(['message' => 'Cannot modify superadmin'], 403);
-        }
-
-        // 验证请求数据
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'password' => 'sometimes|min:6',
-            'role' => 'sometimes|in:admin,user',
+        // 验证密码字段
+        $validatedData = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'current_password.required' => 'Current password is required.',
+            'password.required' => 'New password is required.',
+            'password.min' => 'New password must be at least 6 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
         ]);
 
-        // 更新数据
-        if ($request->has('name')) {
-            $user->name = $request->name;
-        }
-        if ($request->has('email')) {
-            $user->email = $request->email;
-        }
-        if ($request->has('password')) {
-            $user->password = Hash::make($request->password);
-        }
-        if ($request->has('role')) {
-            $user->role = $request->role;
+        // 检查当前密码是否正确
+        if (!Hash::check($validatedData['current_password'], $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 403);
         }
 
-        $user->save();
+        // 更新密码
+        $user->update([
+            'password' => Hash::make($validatedData['password']),
+        ]);
 
-        return response()->json(['message' => 'User updated successfully', 'user' => $user]);
+        return response()->json(['message' => 'Password updated successfully.']);
     }
+
+
+    
 
     /**
      * 删除用户（仅限 superadmin）

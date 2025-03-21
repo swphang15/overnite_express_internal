@@ -15,12 +15,12 @@ class ManifestController extends Controller
 {
 
 
-public function downloadPdf($manifestNo)
-{
-    $export = new ManifestExport();
-    return $export->exportPdf($manifestNo);
-}
-
+    public function downloadPdf($manifestId)
+    {
+        $export = new ManifestExport();
+        return $export->exportPdf($manifestId);
+    }
+    
     public function store(Request $request)
     {
         try {
@@ -128,9 +128,21 @@ public function downloadPdf($manifestNo)
 public function index()
 {
     try {
-        $manifests = ManifestInfo::all();
+        $manifests = ManifestInfo::with('user:id,name')->get();
 
-        return response()->json($manifests, 200);
+        return response()->json($manifests->map(function ($manifest) {
+            return [
+                'id' => $manifest->id,
+                'date' => $manifest->date,
+                'awb_no' => $manifest->awb_no,
+                'to' => $manifest->to,
+                'from' => $manifest->from,
+                'flt' => $manifest->flt,
+                'manifest_no' => $manifest->manifest_no,
+                'user_id' => $manifest->user_id,
+                'created_by' => $manifest->user ? $manifest->user->name : null, // ✅ 获取用户名
+            ];
+        }), 200);
     } catch (Exception $e) {
         return response()->json([
             'message' => 'Failed to retrieve manifests',
@@ -303,6 +315,7 @@ public function update(Request $request, $id)
             'error' => $e->getMessage()
         ], 500);
     }
+    return response()->json(['data' => $request->all()], 200);
 }
 
 

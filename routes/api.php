@@ -13,6 +13,9 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ShippingPlanController;
 use App\Http\Controllers\ShippingRateController;
+use App\Http\Controllers\StatsController;
+
+Route::get('dashboard/count', [StatsController::class, 'getCounts']);
 
 
 
@@ -21,9 +24,14 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users', [UserController::class, 'createUser']); 
     Route::get('/users/{id?}', [UserController::class, 'readUser']); 
-    Route::put('/users/{id}', [UserController::class, 'updateUser']); 
+    // Route::put('/users', [UserController::class, 'updateProfile'])->middleware('auth:sanctum');
+
     Route::delete('/users/{id}', [UserController::class, 'deleteUser']); 
 });
+Route::middleware('auth:sanctum')->put('/users/profile', [UserController::class, 'updateProfile']);
+Route::middleware('auth:sanctum')->put('/users/password', [UserController::class, 'updatePassword']);
+
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/clients', [ClientController::class, 'index']); 
@@ -53,12 +61,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/manifest/{id}', [ManifestController::class, 'show']);
     Route::put('/manifest/{id}', [ManifestController::class, 'update']);
     Route::delete('/manifest/{id}', [ManifestController::class, 'destroy']);
-    Route::delete('/manifest-list/{id}', [ManifestController::class, 'destroy']);
+    Route::delete('/manifest-list/{id}', [ManifestController::class, 'destroyManifestList']);
     Route::post('/estimate-total-price', [ManifestInfoController::class, 'getEstimatedTotalPrice']);
     Route::post('/manifest', [ManifestInfoController::class, 'store']);
+    Route::post('/manifest/list/{id}', [ManifestInfoController::class, 'addLists']);
 
 
-    Route::get('/manifest/pdf/{manifestNo}', [ManifestController::class, 'downloadPdf']);
+
+
+    Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
+
 
 });
 

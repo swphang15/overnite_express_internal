@@ -22,7 +22,8 @@ class ManifestList extends Model
         'remarks',
         'total_price',
         'discount',
-        'origin'
+        'origin',
+        'destination',
     ];
 
     public function manifestInfo()

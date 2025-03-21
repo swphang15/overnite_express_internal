@@ -9,16 +9,18 @@ return new class extends Migration {
     {
         Schema::create('manifest_infos', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('user_id'); // 先创建 user_id
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade'); // 添加外键
             $table->date('date');
-            $table->string('awb_no')->unique();
+            $table->string('awb_no');
             $table->string('to');
             $table->string('from');
             $table->string('flt')->nullable();
-            $table->string('manifest_no')->unique();
+            $table->string('manifest_no');
             $table->timestamps();
-            $table->softDeletes(); // 软删除字段 deleted_at
-            
+            $table->softDeletes();
         });
+        
     }
 
     public function down()

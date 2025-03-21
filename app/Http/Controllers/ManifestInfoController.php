@@ -10,6 +10,7 @@ use App\Models\ManifestList;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 use Exception;
 class ManifestInfoController extends Controller
@@ -20,131 +21,178 @@ class ManifestInfoController extends Controller
          * 获取虚拟的 total_price 让前端确认
          */
         public function getEstimatedTotalPrice(Request $request)
-        {
-            try {
-                // 验证输入
-                $validatedData = $request->validate([
-                    'from' => 'required|string',
-                    'to' => 'required|string',
-                    'consignor_id' => 'required|exists:clients,id',
-                    'kg' => 'required|numeric|min:0',
-                ]);
-    
-                // 计算价格
-                $totalPrice = $this->calculateTotalPrice(
-                    $validatedData['from'],
-                    $validatedData['to'],
-                    $validatedData['consignor_id'],
-                    $validatedData['kg']
-                );
-    
-                return response()->json([
-                    'estimated_total_price' => $totalPrice
-                ], 200);
-    
-            } catch (ValidationException $e) {
-                return response()->json([
-                    'message' => 'Validation failed',
-                    'errors' => $e->errors()
-                ], 422);
-            } catch (Exception $e) {
-                return response()->json([
-                    'message' => 'Error calculating estimated total price',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
-        }
+{
+    try {
+        // 验证输入
+        $validatedData = $request->validate([
+            'origin' => 'required|string',  // ✅ 把 from 改成 origin
+            'destination' => 'required|string', // ✅ 把 to 改成 destination
+            'consignor_id' => 'required|exists:clients,id',
+            'kg' => 'required|numeric|min:0',
+        ]);
+
+        // 计算价格
+        $totalPrice = $this->calculateTotalPrice(
+            $validatedData['origin'],      // ✅ 这里用 origin 代替 from
+            $validatedData['destination'], // ✅ 这里用 destination 代替 to
+            $validatedData['consignor_id'],
+            $validatedData['kg']
+        );
+
+        return response()->json([
+            'estimated_total_price' => $totalPrice
+        ], 200);
+
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (Exception $e) {
+        return response()->json([
+            'message' => 'Error calculating estimated total price',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
     
         /**
          * 创建 Manifest 并存入数据库
          */
-        public function store(Request $request)
-        {
-            try {
-                // 1️⃣ 参数验证
-                $validatedData = $request->validate([
-                    'manifest_info_id' => 'nullable|exists:manifest_infos,id',
-                    'date' => 'required_without:manifest_info_id|date',
-                    'awb_no' => 'required_without:manifest_info_id|string|unique:manifest_infos,awb_no',
-                    'to' => 'required_without:manifest_info_id|string',
-                    'from' => 'required_without:manifest_info_id|string',
-                    'flt' => 'nullable|string',
-    
-                    'lists' => 'required|array|min:1',
-                    'lists.*.consignor_id' => 'required|exists:clients,id',
-                    'lists.*.consignee_name' => 'required|string',
-                    'lists.*.cn_no' => 'required|numeric|unique:manifest_lists,cn_no',
-                    'lists.*.pcs' => 'required|integer|min:1',
-                    'lists.*.kg' => 'required|numeric|min:0',
-                    // 'lists.*.total_price' => 'required|numeric|min:0', // ✅ 直接使用前端传过来的 total_price
-                    'lists.*.total_price' => 'nullable|numeric|min:0', // ✅ total_price 允许为 null
+       
+// 处理创建整个 ManifestInfo + ManifestList
+public function store(Request $request)
+{
+    return $this->handleManifest($request);
+}
 
-                    'lists.*.discount' => 'sometimes|nullable|numeric|min:0',
-                    'lists.*.origin' => 'required|string',
-                    'lists.*.remarks' => 'nullable|string',
-                ]);
-    
-                // 2️⃣ 计算 `manifest_no`
-                $maxManifestNo = ManifestInfo::withTrashed()->max('manifest_no');
-                $nextManifestNo = $this->getNextManifestNo($maxManifestNo);
-    
-                // 3️⃣ 创建或获取 ManifestInfo
-                if (!isset($validatedData['manifest_info_id'])) {
-                    $manifestInfo = ManifestInfo::create([
-                        'date' => $validatedData['date'],
-                        'awb_no' => $validatedData['awb_no'],
-                        'to' => $validatedData['to'],
-                        'from' => $validatedData['from'],
-                        'flt' => $validatedData['flt'],
-                        'manifest_no' => $nextManifestNo,
-                    ]);
-                } else {
-                    $manifestInfo = ManifestInfo::findOrFail($validatedData['manifest_info_id']);
-                }
-    
-                // 4️⃣ 批量创建 ManifestList
-                $manifestLists = [];
-                foreach ($validatedData['lists'] as $index => $list) {
-                    $fullKg = floor($list['kg']);
-                    $grams = ($list['kg'] - $fullKg) * 1000;
-    
-                    $manifestLists[] = ManifestList::create([
-                        'manifest_info_id' => $manifestInfo->id,
-                        'manifest_no' => $nextManifestNo + $index,
-                        'consignor_id' => $list['consignor_id'],
-                        'consignee_name' => $list['consignee_name'],
-                        'cn_no' => $list['cn_no'],
-                        'pcs' => $list['pcs'],
-                        'kg' => $fullKg,
-                        'gram' => $grams,
-                        // 'total_price' => $list['total_price'], // ✅ 直接使用前端传来的 total_price
+// 处理追加 ManifestList 到现有 ManifestInfo
+public function addLists(Request $request, $id)
+{
+    $request->merge(['manifest_info_id' => $id]); // 设置 manifest_info_id
+    return $this->handleManifest($request);
+}
 
-                        'total_price' => $list['total_price'] ?? null, // ✅ total_price 默认 null
+// 处理逻辑复用
+private function handleManifest(Request $request)
+{
+    try {
+        DB::beginTransaction();
 
-                        'discount' => $list['discount'] ?? null,
-                        'origin' => $list['origin'],
-                        'remarks' => $list['remarks'] ?? null,
-                    ]);
-                }
-    
-                return response()->json([
-                    'message' => 'Manifest created successfully',
-                    'manifest_info' => $manifestInfo,
-                    'manifest_list' => $manifestLists
-                ], 201);
-    
-            } catch (ValidationException $e) {
-                return response()->json([
-                    'message' => 'Validation failed',
-                    'errors' => $e->errors()
-                ], 422);
-            } catch (Exception $e) {
-                return response()->json([
-                    'message' => 'Something went wrong',
-                    'error' => $e->getMessage()
-                ], 500);
-            }
+        $validatedData = $request->validate([
+            'manifest_info_id' => 'nullable|exists:manifest_infos,id',
+            'date' => 'required_without:manifest_info_id|date',
+            'awb_no' => 'required_without:manifest_info_id|string|unique:manifest_infos,awb_no',
+            'to' => 'required_without:manifest_info_id|string',
+            'from' => 'required_without:manifest_info_id|string',
+            'flt' => 'nullable|string',
+            'manifest_lists' => 'required|array|min:1',
+            'manifest_lists.*.consignor_id' => 'required|exists:clients,id',
+            'manifest_lists.*.consignee_name' => 'required|string',
+            'manifest_lists.*.cn_no' => 'required|numeric',
+            'manifest_lists.*.pcs' => 'required|integer|min:1',
+            'manifest_lists.*.kg' => 'required|numeric|min:0',
+            'manifest_lists.*.discount' => 'sometimes|nullable|numeric|min:0',
+            'manifest_lists.*.origin' => 'required|string',
+            'manifest_lists.*.remarks' => 'nullable|string',
+        ]);
+
+        // ✅ 获取当前用户 ID
+        $userId = auth()->id(); 
+
+        // ✅ 获取最大 Manifest No
+        $maxManifestNo = ManifestInfo::withTrashed()->max('manifest_no');
+        $nextManifestNo = $this->getNextManifestNo($maxManifestNo);
+
+        if (!isset($validatedData['manifest_info_id'])) {
+            // ✅ 创建新的 ManifestInfo 并记录 `user_id`
+            $manifestInfo = ManifestInfo::create([
+                'date' => $validatedData['date'],
+                'awb_no' => $validatedData['awb_no'],
+                'to' => $validatedData['to'],
+                'from' => $validatedData['from'],
+                'flt' => $validatedData['flt'],
+                'manifest_no' => $nextManifestNo,
+                'user_id' => $userId, // ✅ 记录当前用户 ID
+            ]);
+        } else {
+            // ✅ 追加 ManifestList
+            $manifestInfo = ManifestInfo::findOrFail($validatedData['manifest_info_id']);
         }
+
+        // ✅ 避免重复查询数据库，提高效率
+        $cnNumbers = array_column($validatedData['manifest_lists'], 'cn_no');
+        $existingCNs = ManifestList::whereIn('cn_no', $cnNumbers)->whereNull('deleted_at')->exists();
+
+        if ($existingCNs) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'C/N No already exist and are active!',
+                'errors' => ['cn_no' => ['Some CN numbers already exist and are active.']]
+            ], 422);
+        }
+
+        // ✅ 批量创建 ManifestList，加入 `destination`
+        $manifestLists = collect($validatedData['manifest_lists'])->map(function ($list) use ($manifestInfo) {
+            $totalPrice = $this->calculateTotalPrice(
+                $manifestInfo->from,
+                $manifestInfo->to,
+                $list['consignor_id'],
+                $list['kg']
+            );
+
+            return [
+                'manifest_info_id' => $manifestInfo->id,
+                'consignor_id' => $list['consignor_id'],
+                'consignee_name' => $list['consignee_name'],
+                'cn_no' => $list['cn_no'],
+                'pcs' => $list['pcs'],
+                'kg' => floor($list['kg']),
+                'gram' => round(($list['kg'] - floor($list['kg'])) * 1000),
+                'total_price' => $totalPrice,
+                'discount' => $list['discount'] ?? null,
+                'origin' => $list['origin'],
+                'destination' => $manifestInfo->to, // ✅ 确保 `destination` 被插入
+                'remarks' => $list['remarks'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->toArray();
+
+        ManifestList::insert($manifestLists);
+
+        DB::commit();
+        return response()->json([
+            'message' => 'Manifest created successfully',
+            'manifest_info' => $manifestInfo,
+            'manifest_lists' => $manifestLists
+        ], 201);
+    } catch (ValidationException $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (QueryException $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'Database error',
+            'error' => $e->getMessage()
+        ], 500);
+    } catch (Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'Something went wrong',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
+
+        
         private function getNextManifestNo($maxManifestNo)
         {
             // 检查是否有删除的空缺编号
