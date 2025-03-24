@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ManifestExport;
 use Exception;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ManifestController extends Controller
 {
@@ -129,7 +131,9 @@ class ManifestController extends Controller
     public function index()
     {
         try {
-            $manifests = ManifestInfo::with('user:id,name')->get();
+            $manifests = ManifestInfo::with('user:id,name')
+                ->latest() // 按照 created_at 倒序排序，最新的在最前
+                ->get();
 
             return response()->json($manifests->map(function ($manifest) {
                 return [
@@ -142,6 +146,7 @@ class ManifestController extends Controller
                     'manifest_no' => $manifest->manifest_no,
                     'user_id' => $manifest->user_id,
                     'created_by' => $manifest->user ? $manifest->user->name : null, // ✅ 获取用户名
+                    'created_at' => $manifest->created_at, // 可以让前端看到创建时间
                 ];
             }), 200);
         } catch (Exception $e) {
@@ -151,6 +156,7 @@ class ManifestController extends Controller
             ], 500);
         }
     }
+
 
 
     public function show($id)

@@ -63,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/manifest', [ManifestInfoController::class, 'store']);
     Route::post('/manifest/list/{id}', [ManifestInfoController::class, 'addLists']);
 
+    Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
 
 
 

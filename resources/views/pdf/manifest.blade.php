@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,41 +12,50 @@
             margin: 0;
             padding: 0;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
         }
-        th, td {
+
+        th,
+        td {
             border: 1px solid black;
             padding: 5px;
             text-align: center;
             white-space: nowrap;
             height: 20px;
         }
+
         .header-logo {
             width: 45px;
             height: auto;
             vertical-align: middle;
         }
+
         .company-info {
             text-align: left;
             font-size: 12px;
             font-weight: bold;
         }
+
         .reg-no {
             font-size: 10px;
             font-weight: normal;
         }
+
         .manifest-no {
             color: red;
             font-weight: bold;
         }
+
         .left-align {
             text-align: left;
             padding-left: 5px;
         }
     </style>
 </head>
+
 <body>
 
     @php
@@ -79,7 +89,7 @@
             {{-- ✅ 修改 DATE 部分，显示日期 + 星期几 --}}
             <td style="width: 10%;">
                 <strong>DATE</strong><br>
-                {{ $date->format('Y-m-d') }}<br> 
+                {{ $date->format('Y-m-d') }}<br>
                 ({{ $date->format('l') }}) {{-- 显示完整的星期几，比如 Monday --}}
             </td>
 
@@ -87,7 +97,8 @@
             <td style="width: 5%;"><strong>TO</strong><br>{{ $manifestInfo->to }}</td>
             <td style="width: 5%;"><strong>FROM</strong><br>{{ $manifestInfo->from }}</td>
             <td style="width: 5%;"><strong>FLT</strong><br>{{ $manifestInfo->flt }}</td>
-            <td style="width: 12%;" class="manifest-no"><strong>Manifest No.</strong><br>{{ $manifestInfo->manifest_no }}</td>
+            <td style="width: 12%;" class="manifest-no"><strong>Manifest
+                    No.</strong><br>{{ $manifestInfo->manifest_no }}</td>
         </tr>
     </table>
 
@@ -103,34 +114,35 @@
                 <th style="width: 5%;">PCS</th>
                 <th style="width: 5%;">KG</th>
                 <th style="width: 5%;">GM</th>
-                <th colspan="4">Remarks</th>  {{-- 让 Remarks 标题占据 4 个格子 --}}
+                <th colspan="4">Remarks</th> {{-- 让 Remarks 标题占据 4 个格子 --}}
             </tr>
         </thead>
         <tbody>
             @foreach ($manifestLists as $index => $list)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>{{ $list->origin }}</td>
-                <td>{{ $list->consignor->name }}</td>
-                <td>{{ $list->consignee_name }}</td>
-                <td>{{ $list->cn_no }}</td>
-                <td>{{ $list->pcs }}</td>
-                <td>{{ $list->kg }}</td>
-                <td>{{ $list->gram }}</td>
-                <td style="width: 3%;"></td>
-                <td style="width: 3%;"></td>
-                <td style="width: 3%;"></td>
-                <td style="width: 3%;"></td>
-            </tr>
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td>{{ $list->origin }}</td>
+                    <td>{{ $list->destination }}</td>
+                    <td>{{ $list->consignor->name }}</td>
+                    <td>{{ $list->consignee_name }}</td>
+                    <td>{{ $list->cn_no }}</td>
+                    <td>{{ $list->pcs }}</td>
+                    <td>{{ $list->kg }}</td>
+                    <td>{{ $list->gram }}</td>
+                    <td style="width: 3%;"></td>
+                    <td style="width: 3%;"></td>
+                    <td style="width: 3%;"></td>
+                    <td style="width: 3%;"></td>
+                </tr>
             @endforeach
 
             {{-- ✅ 在最后一行添加 Manifest Weight 和 Total PCS --}}
             <tr>
-                <td></td>  {{-- No 列空白 --}}
+                <td></td> {{-- No 列空白 --}}
                 <td colspan="2" style="text-align: center; font-weight: bold;">Manifest Weight:</td>
                 <td colspan="1" style="text-align: center;">
                     {{-- 计算总重量：KG + (GM/1000) --}}
-                    {{ $manifestLists->sum('kg') + ($manifestLists->sum('gram') / 1000) }} KG
+                    {{ $manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000 }} KG
                 </td>
                 <td colspan="1" style="text-align: center; font-weight: bold;">Total PCS:</td>
                 <td colspan="1" style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td>
@@ -145,4 +157,5 @@
     </table>
 
 </body>
+
 </html>

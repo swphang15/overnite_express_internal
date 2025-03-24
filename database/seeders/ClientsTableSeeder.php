@@ -14,11 +14,12 @@ class ClientsTableSeeder extends Seeder
     public function run(): void
     {
         $clients = [];
+        $companies = ['Company A', 'Company B', 'Company C', 'Company D', 'Company E'];
 
-        for ($i = 1; $i <= 10; $i++) {
+        foreach ($companies as $company) {
             $clients[] = [
-                'shipping_plan_id' => rand(1, 2), // 假设 shipping_plan_id 在 1 到 5 之间
-                'name' => 'Client ' . $i,
+                'shipping_plan_id' => rand(1, 2), // 假设 shipping_plan_id 在 1 到 2 之间
+                'name' => $company,
                 'created_at' => Carbon::now()->subDays(rand(1, 30)),
                 'updated_at' => Carbon::now(),
                 'deleted_at' => null,
