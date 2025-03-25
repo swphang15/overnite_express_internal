@@ -14,22 +14,34 @@ class SuperAdminSeeder extends Seeder
         $superadmin = User::create([
             'name' => 'Super Admin',
             'email' => 'superadmin@example.com',
-            'password' => bcrypt('admin1234'),
+            'password' => bcrypt('1234'),
             'role' => 'superadmin',
         ]);
 
         $superadmin->tokens()->delete(); // Clear existing tokens
         $token = $superadmin->createToken('superadmin-token')->plainTextToken;
-
         echo "Superadmin Token: " . $token . "\n";
+
+        // Create Admin
+        User::create([
+            'name' => 'Admin',
+            'email' => 'admin@mail.com',
+            'password' => bcrypt('1234'),
+            'role' => 'admin',
+        ]);
+
+        // Create Regular User
+        User::create([
+            'name' => 'User',
+            'email' => 'user@mail.com',
+            'password' => bcrypt('1234'),
+            'role' => 'user',
+        ]);
 
         // Additional Users
         $users = [
             ['name' => 'Overnite', 'role' => 'admin'],
             ['name' => 'Codligence', 'role' => 'user'],
-            ['name' => 'Salted Peanuts', 'role' => 'user'],
-            ['name' => 'Eclipse Plus', 'role' => 'user'],
-            ["name" => "Julie's", 'role' => 'user']
         ];
 
         foreach ($users as $user) {

@@ -14,6 +14,7 @@ use App\Exports\ManifestExport;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ManifestController extends Controller
 {
@@ -21,10 +22,16 @@ class ManifestController extends Controller
 
     public function downloadPdf($manifestId)
     {
-        $export = new ManifestExport();
+        $export = new ManifestExport($manifestId);
         return $export->exportPdf($manifestId);
     }
 
+    // 📌 【2️⃣ 导出 Excel 】
+
+    public function exportManifestExcel($consignor_id)
+    {
+        return Excel::download(new ManifestExport($consignor_id), "Manifest_Consignor_{$consignor_id}.xlsx");
+    }
     public function store(Request $request)
     {
         try {
@@ -184,6 +191,7 @@ class ManifestController extends Controller
                     'total_price' => $item->total_price,
                     'discount' => $item->discount,
                     'origin' => $item->origin,
+                    'destination' => $item->destination,
                     'created_at' => $item->created_at,
                     'updated_at' => $item->updated_at,
                     'deleted_at' => $item->deleted_at

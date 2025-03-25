@@ -1,171 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Report</title>
-
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
+    <title>Manifest PDF</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
-            color: #484b51;
-            background: #fff;
-        }
-
-        /* 让 INVOICE 和 No. : I-2411-13 在同一行 */
-        .page-header {
-            display: flex;
-            align-items: center;
-            border-bottom: 2px solid #e2e2e2;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-        }
-
-        .invoice-title {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4076d4;
-        }
-
-        .invoice-number {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        /* 让公司信息和发票信息严格对齐 */
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .info-table td {
-            vertical-align: top;
-            padding: 2px;  /* 减少间距 */
-        }
-
-        .info-right {
-            text-align: right;
-        }
-
-        /* 让每个数据之间的行距固定 */
-        .info-table p {
+            font-size: 10px;
             margin: 0;
-            line-height: 1.4;
+            padding: 0;
         }
 
-        /* 发票表格 */
-        .table-container {
-            margin-top: 15px;
-        }
-
-        .data-table {
+        table {
             width: 100%;
             border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid black;
+            padding: 5px;
             text-align: center;
+            white-space: nowrap;
+            height: 20px;
         }
 
-        .data-table th, .data-table td {
-            padding: 8px;
-            border: 1px solid #ddd;
-            height: 35px; /* 固定行高 */
+        .header-logo {
+            width: 45px;
+            height: auto;
+            vertical-align: middle;
         }
 
-        .data-table th {
-            background-color: #f3f8fa;
+        .company-info {
+            text-align: left;
+            font-size: 12px;
             font-weight: bold;
         }
 
-        .total-row {
-            background: #e9f6ff;
+        .reg-no {
+            font-size: 10px;
+            font-weight: normal;
+        }
+
+        .manifest-no {
+            color: red;
             font-weight: bold;
         }
 
-        .footer {
-            margin-top: 20px;
-            font-size: 14px;
-            text-align: center;
-            color: #6c757d;
+        .left-align {
+            text-align: left;
+            padding-left: 5px;
         }
     </style>
 </head>
+
 <body>
 
-    <!-- Invoice 标题 和 发票编号 -->
-    <div class="page-header d-flex align-items-center">
-        <h1 class="invoice-title">INVOICE</h1>
-        <p class="invoice-number ms-auto">No. : I-2411-13</p>
-    </div>
+    @php
+        use Carbon\Carbon;
+        $date = Carbon::parse($manifestInfo->date);
+    @endphp
 
-    <!-- 公司 & 发票信息 -->
-    <table class="info-table">
+    {{-- **📌 顶部表格（公司信息 + 单号）** --}}
+    <table>
         <tr>
-            <td>
-                <p><strong>COMPANY A</strong></p>
-                <p><strong>CLIENT / DESTINATION</strong></p>
-                <p>TEL: 01358838822 &nbsp;&nbsp;&nbsp; FAX: 082-2344332</p>
+            <td style="width: 30%; text-align: left; vertical-align: middle;">
+                <table style="border: none; width: 100%;">
+                    <tr>
+                        <td style="width: 50px; vertical-align: middle; border: none;">
+                            <img src="{{ public_path('images/overnite express logo.png') }}" class="header-logo">
+                        </td>
+                        <td style="border: none; vertical-align: middle; text-align: left;">
+                            <span class="company-info">
+                                OVERNITE EXPRESS<br>(S) SDN BHD
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-size: 10px; border: none;">
+                            <span class="reg-no">Reg. No: 199001000275 / 191833U</span>
+                        </td>
+                    </tr>
+                </table>
             </td>
-            <td class="info-right">
-                <p>Your Ref. : Y13827442</p>
-                <p>Our D/O No. : 123</p>
-                <p>Terms : C.O.D.</p>
-                <p>Date : 30/11/2024</p>
-                <p>Page : 1 of 6</p>
+
+            {{-- ✅ 修改 DATE 部分，显示日期 + 星期几 --}}
+            <td style="width: 12%;">
+                <strong>DATE</strong><br>
+                {{ $date->format('Y-m-d') }}<br>
+                ({{ $date->format('l') }}) {{-- 显示完整的星期几，比如 Monday --}}
             </td>
+
+            <td style="width: 18%;"><strong>AWB No.</strong><br>{{ $manifestInfo->awb_no }}</td>
+            <td style="width: 7%;"><strong>TO</strong><br>{{ $manifestInfo->to }}</td>
+            <td style="width: 7%;"><strong>FROM</strong><br>{{ $manifestInfo->from }}</td>
+            <td style="width: 7%;"><strong>FLT</strong><br>{{ $manifestInfo->flt }}</td>
+            <td style="width: 19%;" class="manifest-no"><strong>Manifest
+                    No.</strong><br>{{ $manifestInfo->manifest_no }}</td>
         </tr>
     </table>
 
-    <hr>
 
-    <!-- 发票表格 -->
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Description</th>
-                    <th>Consignment Note</th>
-                    <th>Delivery Date</th>
-                    <th>Qty</th>
-                    <th>UOM</th>
-                    <th>U/ Price RM</th>
-                    <th>Disc.</th>
-                    <th>Total RM</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php $totalAmount = 0; @endphp
-                @foreach($manifests as $index => $manifest)
+    {{-- **📌 主表格（数据部分）** --}}
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 3%;">No</th>
+                <th style="width: 6%;">Origin</th>
+                <th style="width: 6%;">Destination</th> <!-- ✅ 新增 Destination -->
+                <th style="width: 12%;">Consignor</th>
+                <th style="width: 12%;">Consignee</th>
+                <th style="width: 24%;">CN No</th>
+                <th style="width: 7%;">PCS</th>
+                <th style="width: 7%;">KG</th>
+                <th style="width: 7%;">GM</th>
+                <th style="width: 16%;" colspan="4">Remarks</th> <!-- ✅ 确保对齐 -->
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($manifestLists as $index => $list)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td>{{ $manifest->from }} - {{ $manifest->to }}</td>
-                    <td>{{ $manifest->cn_no }}</td>
-                    <td>{{ $manifest->date }}</td>
-                    <td>{{ $manifest->pcs }}</td>
-                    <td>KG</td>
-                    <td>{{ number_format($manifest->price_per_kg, 2) }}</td>
-                    <td>0.00</td>
-                    <td>{{ number_format($manifest->total_price, 2) }}</td>
+                    <td>{{ $list->origin }}</td>
+                    <td>{{ $list->destination }}</td> <!-- ✅ 确保 Destination 对齐 -->
+                    <td>{{ $list->consignor->name }}</td>
+                    <td>{{ $list->consignee_name }}</td>
+                    <td>{{ $list->cn_no }}</td>
+                    <td>{{ $list->pcs }}</td>
+                    <td>{{ $list->kg }}</td>
+                    <td>{{ $list->gram }}</td>
+                    <td style="width: 4%;"></td>
+                    <td style="width: 4%;"></td>
+                    <td style="width: 4%;"></td>
+                    <td style="width: 4%;"></td>
                 </tr>
-                @php $totalAmount += $manifest->total_price; @endphp
-                @endforeach
-            </tbody>
-            <tfoot>
-                <tr class="total-row">
-                    <td colspan="8" class="text-end">Total Price:</td>
-                    <td>{{ number_format($totalAmount, 2) }}</td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
+            @endforeach
 
-    <div class="footer">
-        Thank you for your business! If you have any questions about this invoice, please contact us.
-    </div>
+            {{-- ✅ 在最后一行添加 Manifest Weight 和 Total PCS --}}
+            <tr>
+                <td></td> {{-- No 列空白 --}}
+                <td colspan="2" style="text-align: center; font-weight: bold;">Manifest Weight:</td>
+                <td colspan="1" style="text-align: center;">
+                    {{-- 计算总重量：KG + (GM/1000) --}}
+                    {{ $manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000 }} KG
+                </td>
+                <td colspan="1" style="text-align: center; font-weight: bold;">Total PCS:</td>
+                <td colspan="1" style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td>
+                <td colspan="2" style="text-align: center; font-weight: bold;">AWB WEIGHT:</td>
+                <td colspan="1"></td> {{-- 让出位置，避免错位 --}}
+                <td colspan="1"></td>
+                <td colspan="1"></td>
+                <td colspan="1"></td>
+            </tr>
+        </tbody>
+    </table>
+
 
 </body>
+
 </html>

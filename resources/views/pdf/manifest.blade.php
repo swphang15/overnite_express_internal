@@ -63,10 +63,10 @@
         $date = Carbon::parse($manifestInfo->date);
     @endphp
 
-    {{-- **📌 顶部表格（公司信息 + 单号）** --}}
+    <!-- ✅ 顶部表格（公司信息 + 单号） -->
     <table>
         <tr>
-            <td style="width: 22%; text-align: left; vertical-align: middle;">
+            <td style="width: 33.5%; text-align: left; vertical-align: middle;">
                 <table style="border: none; width: 100%;">
                     <tr>
                         <td style="width: 50px; vertical-align: middle; border: none;">
@@ -86,35 +86,35 @@
                 </table>
             </td>
 
-            {{-- ✅ 修改 DATE 部分，显示日期 + 星期几 --}}
-            <td style="width: 10%;">
+            <td style="width: 11%;">
                 <strong>DATE</strong><br>
                 {{ $date->format('Y-m-d') }}<br>
-                ({{ $date->format('l') }}) {{-- 显示完整的星期几，比如 Monday --}}
+                ({{ $date->format('l') }})
             </td>
 
             <td style="width: 15%;"><strong>AWB No.</strong><br>{{ $manifestInfo->awb_no }}</td>
-            <td style="width: 5%;"><strong>TO</strong><br>{{ $manifestInfo->to }}</td>
-            <td style="width: 5%;"><strong>FROM</strong><br>{{ $manifestInfo->from }}</td>
-            <td style="width: 5%;"><strong>FLT</strong><br>{{ $manifestInfo->flt }}</td>
-            <td style="width: 12%;" class="manifest-no"><strong>Manifest
+            <td style="width: 8%;"><strong>TO</strong><br>{{ $manifestInfo->to }}</td>
+            <td style="width: 8%;"><strong>FROM</strong><br>{{ $manifestInfo->from }}</td>
+            <td style="width: 8%;"><strong>FLT</strong><br>{{ $manifestInfo->flt }}</td>
+            <td style="width: 18.5%;" class="manifest-no"><strong>Manifest
                     No.</strong><br>{{ $manifestInfo->manifest_no }}</td>
         </tr>
     </table>
 
-    {{-- **📌 主表格（数据部分）** --}}
+    <!-- ✅ 主表格（数据部分） -->
     <table>
         <thead>
             <tr>
-                <th style="width: 4%;">No</th>
+                <th style="width: 5%;">No</th>
                 <th style="width: 8%;">Origin</th>
-                <th style="width: 10%;">Consignor</th>
-                <th style="width: 10%;">Consignee</th>
+                <th style="width: 8%;">Destination</th> <!-- ✅ 新增 Destination -->
+                <th style="width: 11%;">Consignor</th>
+                <th style="width: 11%;">Consignee</th>
                 <th style="width: 15%;">CN No</th>
-                <th style="width: 5%;">PCS</th>
-                <th style="width: 5%;">KG</th>
-                <th style="width: 5%;">GM</th>
-                <th colspan="4">Remarks</th> {{-- 让 Remarks 标题占据 4 个格子 --}}
+                <th style="width: 8%;">PCS</th>
+                <th style="width: 8%;">KG</th>
+                <th style="width: 8%;">GM</th>
+                <th colspan="4" style="width: 18%;">Remarks</th>
             </tr>
         </thead>
         <tbody>
@@ -122,32 +122,32 @@
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $list->origin }}</td>
-                    <td>{{ $list->destination }}</td>
+                    <td>{{ $list->destination }}</td> <!-- ✅ 新增 Destination -->
                     <td>{{ $list->consignor->name }}</td>
                     <td>{{ $list->consignee_name }}</td>
                     <td>{{ $list->cn_no }}</td>
                     <td>{{ $list->pcs }}</td>
                     <td>{{ $list->kg }}</td>
                     <td>{{ $list->gram }}</td>
-                    <td style="width: 3%;"></td>
-                    <td style="width: 3%;"></td>
-                    <td style="width: 3%;"></td>
-                    <td style="width: 3%;"></td>
+                    <td style="width: 5%;"></td>
+                    <td style="width: 5%;"></td>
+                    <td style="width: 5%;"></td>
+                    <td style="width: 5%;"></td>
                 </tr>
             @endforeach
 
-            {{-- ✅ 在最后一行添加 Manifest Weight 和 Total PCS --}}
+            <!-- ✅ 最后一行：计算 Manifest Weight & Total PCS -->
             <tr>
-                <td></td> {{-- No 列空白 --}}
-                <td colspan="2" style="text-align: center; font-weight: bold;">Manifest Weight:</td>
+                <td></td> <!-- No 列空白 -->
+                <td colspan="3" style="text-align: center; font-weight: bold;">Manifest Weight:</td>
                 <td colspan="1" style="text-align: center;">
-                    {{-- 计算总重量：KG + (GM/1000) --}}
-                    {{ $manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000 }} KG
+                    {{ number_format($manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000, 2) }} KG
                 </td>
+
                 <td colspan="1" style="text-align: center; font-weight: bold;">Total PCS:</td>
                 <td colspan="1" style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td>
                 <td colspan="2" style="text-align: center; font-weight: bold;">AWB WEIGHT:</td>
-                <td colspan="1"></td> {{-- 让出位置，避免错位 --}}
+                <td colspan="1"></td> <!-- 让出位置，避免错位 -->
                 <td colspan="1"></td>
                 <td colspan="1"></td>
                 <td colspan="1"></td>

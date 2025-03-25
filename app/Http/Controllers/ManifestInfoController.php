@@ -250,4 +250,46 @@ class ManifestInfoController extends Controller
 
         return (float) ($shippingRate->minimum_price + $extraCost);
     }
+
+
+    public function searchManifest(Request $request)
+    {
+        // 验证 consignor_id 必填，start_date 和 end_date 变成可选
+        $request->validate([
+            'consignor_id' => 'required|integer',
+            'start_date'   => 'nullable|date',
+            'end_date'     => 'nullable|date'
+        ]);
+
+        // 查询数据库
+        $query = DB::table('manifest_lists')
+            ->where('consignor_id', $request->consignor_id)
+            ->select(
+                DB::raw("CONCAT('DCN ', origin, '-', destination) AS Description"),
+                'cn_no as "Consignment Note"',  // **不能有空格**
+                DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') AS 'Delivery Date' "),
+                'pcs as Qty',
+                'total_price as Total_RM'
+            );
+
+        // 如果有 start_date 和 end_date，则加上日期范围过滤
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $start_date = $request->start_date . " 00:00:00";
+            $end_date = $request->end_date . " 23:59:59"; // **确保包含完整一天的数据**
+
+            $query->whereBetween('created_at', [$start_date, $end_date]);
+        }
+
+        // 获取查询结果
+        $manifests = $query->get();
+
+        // 计算总价格
+        $totalPrice = $manifests->sum('Total_RM');
+
+        // 返回 JSON 响应，包含数据 + 总价格
+        return response()->json([
+            'data' => $manifests,
+            'total_price' => $totalPrice
+        ]);
+    }
 }

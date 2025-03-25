@@ -14,8 +14,8 @@ class UserController extends Controller
      */
     public function createUser(Request $request)
     {
-        // 确保调用者是 superadmin
-        if ($request->user()->role !== 'superadmin') {
+        $user = $request->user();
+        if (!in_array($user->role, ['superadmin', 'admin'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -41,54 +41,75 @@ class UserController extends Controller
      */
     public function readUser(Request $request, $id = null)
     {
-        if ($request->user()->role !== 'superadmin') {
+        $response = null;
+
+        if (!in_array($request->user()->role, ['admin', 'superadmin'])) {
+            $response = response()->json(['message' => 'Forbidden'], 403);
+        } elseif ($id) {
+            $user = User::find($id);
+            $response = $user
+                ? response()->json($user)
+                : response()->json(['message' => 'User not found'], 404);
+        } else {
+            $users = User::whereNotIn('role', ['superadmin'])->get(); // Exclude only superadmin
+            $response = response()->json($users);
+        }
+
+        return $response;
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if (!in_array($user->role, ['superadmin', 'admin'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        if ($id) {
-            $user = User::find($id);
-            if (!$user) {
-                return response()->json(['message' => 'User not found'], 404);
-            }
-            return response()->json($user); // 直接返回用户对象
-        }
-
-        $users = User::where('role', '!=', 'superadmin')->get(); // 获取所有非 superadmin 用户
-        return response()->json($users);
-    }
-
-
-    /**
-     * 更新用户信息（仅限 superadmin）
-     */
-    public function updateProfile(Request $request)
-    {
-        // 确保用户已登录
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        // 验证 name 和 email（忽略当前用户自己的 email）
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'email' => [
-                'required',
+                'sometimes',
                 'email',
                 Rule::unique('users', 'email')->ignore($user->id)
             ],
-        ], [
-            'name.required' => 'Name is required.',
-            'email.required' => 'Email is required.',
-            'email.email' => 'Invalid email format.',
-            'email.unique' => 'This email is already in use.',
         ]);
 
-        // 更新用户信息
         $user->update($validatedData);
 
         return response()->json(['message' => 'Profile updated successfully.', 'user' => $user]);
     }
+
+    public function updateUser(Request $request, $id = null)
+    {
+        $authUser = $request->user();
+
+        if (!in_array($authUser->role, ['superadmin', 'admin'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // If no ID is provided, update the authenticated user
+        $user = $id ? User::find($id) : $authUser;
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'sometimes',
+                'email',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'role' => 'sometimes|string|in:superadmin,admin,user',
+        ]);
+
+        $user->update($validatedData);
+
+        return response()->json(['message' => 'User updated successfully.', 'user' => $user]);
+    }
+
 
     /**
      * 更新密码
@@ -133,8 +154,8 @@ class UserController extends Controller
      */
     public function deleteUser(Request $request, $id)
     {
-        // 确保当前用户是 superadmin
-        if ($request->user()->role !== 'superadmin') {
+        $user = $request->user();
+        if (!in_array($user->role, ['superadmin', 'admin'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 

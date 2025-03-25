@@ -24,8 +24,7 @@ class ManifestSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $year = Carbon::now()->year; // Get current year (e.g., 2025)
-        $month = rand(2, 3); // Randomly choose February (2) or March (3)
-        $month = str_pad($month, 2, '0', STR_PAD_LEFT); // Format to "02" or "03"
+        $month = str_pad(3, 2, '0', STR_PAD_LEFT);
 
         $plans = [];
         for ($i = 1; $i <= 20; $i++) {
@@ -35,7 +34,7 @@ class ManifestSeeder extends Seeder
                 'user_id' => '1',
                 'manifest_no' => $manifest_no, // YYYYMM###
                 'date' => '2025-03-24',
-                'awb_no' => 'I-' . str_pad($i, 3, '0', STR_PAD_LEFT), // 001, 002, 003...
+                'awb_no' => 'I-' . rand(100, 9999) . '-' . rand(1, 99),
                 'to' => ['KUL', 'SBW', 'BKI', 'JHB'][array_rand(['KUL', 'SBW', 'BKI', 'JHB'])],
                 'from' => 'KCH',
                 'flt' => 'COD',
@@ -52,7 +51,7 @@ class ManifestSeeder extends Seeder
                 'user_id' => '2',
                 'manifest_no' => $manifest_no, // YYYYMM###
                 'date' => '2025-03-24',
-                'awb_no' => 'I-' . str_pad($i, 3, '0', STR_PAD_LEFT), // 021, 022
+                'awb_no' => 'I-' . rand(100, 9999) . '-' . rand(1, 99),
                 'to' => ['KUL', 'SBW', 'BKI', 'JHB'][array_rand(['KUL', 'SBW', 'BKI', 'JHB'])],
                 'from' => 'KCH',
                 'flt' => 'COD',
@@ -61,14 +60,16 @@ class ManifestSeeder extends Seeder
             ];
         }
 
+        // Insert manifests and retrieve their IDs
         DB::table('manifest_infos')->insert($plans);
+        $manifestRecords = DB::table('manifest_infos')->get(); // Fetch all inserted records
 
         // 生成 Shipping Rates
         $rates = [];
-        foreach ($plans as $plan) {
+        foreach ($manifestRecords as $plan) {
             for ($j = 1; $j <= 5; $j++) { // Generate 5 items per manifest
                 $rates[] = [
-                    'manifest_info_id' => $plan['id'],
+                    'manifest_info_id' => $plan->id,
                     'consignor_id' => rand(1, 2),
                     'consignee_name' => 'Agent ' . rand(1, 5),
                     'cn_no' => rand(100, 10000), // CN number within 100 - 10000

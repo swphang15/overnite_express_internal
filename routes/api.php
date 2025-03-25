@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 Route::middleware('auth:sanctum')->put('/users/profile', [UserController::class, 'updateProfile']);
 Route::middleware('auth:sanctum')->put('/users/password', [UserController::class, 'updatePassword']);
+Route::middleware('auth:sanctum')->put('/users/profile/{id?}', [UserController::class, 'updateUser']);
 
 
 
@@ -64,10 +65,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/manifest/list/{id}', [ManifestInfoController::class, 'addLists']);
 
     Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
-
-
-
     Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
+    Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
+    Route::get('/manifest/excel/{manifestId}', [ManifestController::class, 'exportManifestExcel']);
 });
 
 
