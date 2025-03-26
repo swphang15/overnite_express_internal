@@ -26,7 +26,18 @@ class ManifestInfoController extends Controller
                 'destination' => 'required|string',
                 'consignor_id' => 'required|exists:clients,id',
                 'kg' => 'required|numeric|min:0',
+                'cn_no' => 'required|numeric', // 添加 CN No 检查
             ]);
+
+            // 检查 CN No 是否已经存在
+            $existingManifest = ManifestList::where('cn_no', $validatedData['cn_no'])->exists();
+
+            if ($existingManifest) {
+                return response()->json([
+                    'estimated_total_price' => "0.00",
+                    'message' => "CN No: {$validatedData['cn_no']} already exists, total price set to 0."
+                ], 200);
+            }
 
             $totalPrice = $this->calculateTotalPrice(
                 $validatedData['origin'],
@@ -266,7 +277,7 @@ class ManifestInfoController extends Controller
             ->where('consignor_id', $request->consignor_id)
             ->select(
                 DB::raw("CONCAT('DCN ', origin, '-', destination) AS Description"),
-                'cn_no as "Consignment Note"',  // **不能有空格**
+                'cn_no as Consignment Note',  // **不能有空格**
                 DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') AS 'Delivery Date' "),
                 'pcs as Qty',
                 'total_price as Total_RM'

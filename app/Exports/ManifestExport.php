@@ -3,7 +3,6 @@
 namespace App\Exports;
 
 use Barryvdh\DomPDF\Facade\Pdf;
-
 use App\Models\ManifestInfo;
 use App\Models\ManifestList;
 use Maatwebsite\Excel\Concerns\FromView;
@@ -31,16 +30,12 @@ class ManifestExport implements FromView
         return $pdf->download("Manifest_{$manifestInfo->id}.pdf");
     }
 
-
-
+    // ✅ 实现 FromView 接口的 view 方法
     public function view(): View
     {
-        // ✅ 按 `consignor_id` 查询 Manifest List 数据
         $manifestLists = ManifestList::where('consignor_id', $this->consignor_id)->get();
-
-        return view('excel.manifest', [
-            'consignor_id' => $this->consignor_id,
-            'manifestLists' => $manifestLists,
+        return view('exports.manifest', [
+            'manifestLists' => $manifestLists
         ]);
     }
 }

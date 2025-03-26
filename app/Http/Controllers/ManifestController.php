@@ -11,6 +11,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ManifestExport;
+use App\Exports\ManifestExcelExport;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -30,8 +31,10 @@ class ManifestController extends Controller
 
     public function exportManifestExcel($consignor_id)
     {
-        return Excel::download(new ManifestExport($consignor_id), "Manifest_Consignor_{$consignor_id}.xlsx");
+        return Excel::download(new ManifestExcelExport($consignor_id), "Manifest_invoice_{$consignor_id}.xlsx");
     }
+
+    
     public function store(Request $request)
     {
         try {
