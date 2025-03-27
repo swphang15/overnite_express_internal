@@ -34,7 +34,7 @@ class ManifestController extends Controller
         return Excel::download(new ManifestExcelExport($consignor_id), "Manifest_invoice_{$consignor_id}.xlsx");
     }
 
-    
+
     public function store(Request $request)
     {
         try {
@@ -218,107 +218,24 @@ class ManifestController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // 📝 验证请求数据
+            // 📝 仅验证 `ManifestInfo` 的数据
             $validatedData = $request->validate([
                 'date' => 'required|date',
-                'awb_no' => 'required|string|unique:manifest_infos,awb_no,' . $id,
+                'awb_no' => 'required|string', // ❌ 不检查唯一性
                 'to' => 'required|string',
                 'from' => 'required|string',
                 'flt' => 'nullable|string',
-
-                'manifest_lists' => 'required|array|min:1',
-                'manifest_lists.*.id' => 'nullable|exists:manifest_lists,id',
-                'manifest_lists.*.consignor_id' => 'required|exists:clients,id',
-                'manifest_lists.*.consignee_name' => 'required|string',
-                'manifest_lists.*.cn_no' => [
-                    'required',
-                    'numeric',
-                    function ($attribute, $value, $fail) use ($request, $id) {
-                        $listIndex = explode('.', $attribute)[1];
-                        $listId = $request->input("manifest_lists.$listIndex.id");
-
-                        if ($listId) {
-                            // If updating an existing record, check excluding itself
-                            $exists = ManifestList::where('cn_no', $value)
-                                ->where('id', '!=', $listId)
-                                ->exists();
-                        } else {
-                            // If creating a new record, check only within the same manifest
-                            $exists = ManifestList::where('cn_no', $value)
-                                ->where('manifest_info_id', $id) // Only check within the same manifest
-                                ->exists();
-                        }
-
-                        if ($exists) {
-                            $fail('The ' . $attribute . ' has already been taken.');
-                        }
-                    }
-                ],
-                'manifest_lists.*.pcs' => 'required|integer|min:1',
-                'manifest_lists.*.kg' => 'required|numeric|min:0',
-                'manifest_lists.*.origin' => 'required|string',
-                'manifest_lists.*.remarks' => 'nullable|string',
             ]);
 
             // ✨ 查找 ManifestInfo
             $manifestInfo = ManifestInfo::findOrFail($id);
 
             // ✏️ 更新 ManifestInfo
-            $manifestInfo->update([
-                'date' => $validatedData['date'],
-                'awb_no' => $validatedData['awb_no'],
-                'to' => $validatedData['to'],
-                'from' => $validatedData['from'],
-                'flt' => $validatedData['flt'],
-            ]);
-
-            // 🚀 处理 ManifestLists 的更新
-            foreach ($validatedData['manifest_lists'] as $list) {
-                if (isset($list['id'])) {
-                    // ✅ 更新现有的 ManifestList
-                    $manifestList = ManifestList::findOrFail($list['id']);
-                    $manifestList->update([
-                        'consignor_id' => $list['consignor_id'],
-                        'consignee_name' => $list['consignee_name'],
-                        'cn_no' => $list['cn_no'],
-                        'pcs' => $list['pcs'],
-                        'kg' => floor($list['kg']),
-                        'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
-                        'origin' => $list['origin'],
-                        'remarks' => $list['remarks'] ?? null,
-                        'total_price' => $this->calculateTotalPrice(
-                            $manifestInfo->from,
-                            $manifestInfo->to,
-                            $list['consignor_id'],
-                            $list['kg']
-                        ),
-                    ]);
-                } else {
-                    // ➕ 创建新的 ManifestList
-                    ManifestList::create([
-                        'manifest_info_id' => $manifestInfo->id,
-                        'manifest_no' => $manifestInfo->manifest_no,
-                        'consignor_id' => $list['consignor_id'],
-                        'consignee_name' => $list['consignee_name'],
-                        'cn_no' => $list['cn_no'],
-                        'pcs' => $list['pcs'],
-                        'kg' => floor($list['kg']),
-                        'gram' => ($list['kg'] - floor($list['kg'])) * 1000, // 计算 gram
-                        'origin' => $list['origin'],
-                        'remarks' => $list['remarks'] ?? null,
-                        'total_price' => $this->calculateTotalPrice(
-                            $manifestInfo->from,
-                            $manifestInfo->to,
-                            $list['consignor_id'],
-                            $list['kg']
-                        ),
-                    ]);
-                }
-            }
+            $manifestInfo->update($validatedData);
 
             return response()->json([
                 'message' => 'Manifest updated successfully',
-                'manifest_info' => $manifestInfo->load('manifestLists')
+                'manifest_info' => $manifestInfo
             ], 200);
         } catch (ValidationException $e) {
             return response()->json([
@@ -331,7 +248,6 @@ class ManifestController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-        return response()->json(['data' => $request->all()], 200);
     }
 
 
