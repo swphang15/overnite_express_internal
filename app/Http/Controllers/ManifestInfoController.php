@@ -268,8 +268,8 @@ class ManifestInfoController extends Controller
         // 验证 consignor_id 必填，start_date 和 end_date 变成可选
         $request->validate([
             'consignor_id' => 'required|integer',
-            'start_date'   => 'nullable|date',
-            'end_date'     => 'nullable|date'
+            'start_date'   => 'required|date',
+            'end_date'     => 'required|date'
         ]);
 
         // 查询数据库
