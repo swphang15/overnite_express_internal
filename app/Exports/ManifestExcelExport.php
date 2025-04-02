@@ -19,10 +19,15 @@ use Carbon\Carbon;
 class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithEvents
 {
     protected $consignorId;
+    protected $startDate;
+    protected $endDate;
+    protected $totalPrice; // ✅ 新增 totalPrice 属性
 
-    public function __construct($consignorId)
+    public function __construct($consignorId, $startDate, $endDate)
     {
         $this->consignorId = $consignorId;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
     }
 
     /**
@@ -65,49 +70,58 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         $data = [];
         $totalPrice = 0;
 
+        // 获取 Consignor 信息
         $consignor = Client::find($this->consignorId);
         $consignorName = $consignor ? $consignor->name : "UNKNOWN";
 
+        // 查询 Manifest 数据，并按日期筛选
         $manifestData = DB::table('manifest_lists')
             ->where('consignor_id', $this->consignorId)
+            ->whereBetween('created_at', [
+                Carbon::parse($this->startDate)->startOfDay(),
+                Carbon::parse($this->endDate)->endOfDay()
+            ])
             ->get();
 
+        // 生成 Invoice No.
         $exportNo = $this->generateExportNo();
         $exportDate = Carbon::now()->format('d-m-Y');
 
-        $counter = 1;
-
-        $data[] = ["", "",  "INVOICE", "", "", "No.", ":$exportNo"];
+        // **Excel 头部**
+        $data[] = ["", "", "INVOICE", "", "", "No.", ": $exportNo"];
         $data[] = [$consignorName, "", "", "", "", "Your Ref.", ":"];
         $data[] = ["", "", "", "", "", "Our D/O No.", ":"];
         $data[] = ["CLIENT / DESTINATION", "", "", "", "", "Terms", ":"];
-        $data[] = ["", "", "", "", "", "Date", ":$exportDate"];
+        $data[] = ["", "", "", "", "", "Date", ": $exportDate"];
         $data[] = ["TEL : ____________", "", "FAX : ____________", "", "", "Page", ":"];
-        $data[] = [""];
+        $data[] = [""]; // 空行
         $data[] = ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "UOM", "Total RM"];
 
-        $totalPrice = 0;
+        // **数据内容**
+        $counter = 1;
         foreach ($manifestData as $row) {
-            // 确保 total_price 存在且是数字
-            $rowTotal = is_numeric($row->total_price) ? floatval($row->total_price) : 0;
-            $totalPrice += $rowTotal; // 计算总和
+            // 确保 `total_price` 存在且为数字
+            $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
+            $totalPrice += $rowTotal;
 
-            $data[] = [
+            $data[] = array_pad([
                 $counter++, // Item 递增
                 "DCN " . $row->origin . " - " . $row->destination, // Description
                 $row->cn_no, // Consignment Note
-                date('d-m-Y', strtotime($row->created_at)), // Delivery Date
+                Carbon::parse($row->created_at)->format('d-m-Y'), // Delivery Date
                 $row->pcs, // Qty
                 "KG", // UOM
                 number_format($rowTotal, 2) // Total RM
-            ];
+            ], 7, ""); // 确保数据有 7 列，防止列错位
         }
 
         // **添加 Total Price 行**
-        $totalRowIndex = count($data) + 1; // 获取总价所在行索引
-        $data[] = ["", "", "", "", "TOTAL PRICE:", number_format($totalPrice, 2)];
+        $data[] = ["", "", "", "", "", "", ""]; // ✅ 插入空行
+        $data[] = ["", "", "", "",  "", "TOTAL PRICE:", number_format($totalPrice, 2)];
+
         return new Collection($data);
     }
+
 
     public function headings(): array
     {
@@ -129,8 +143,8 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
             'B' => 16.44,
             'C' => 21.00,
             'D' => 13.44,
-            'E' => 13.67,
-            'F' => 10.78,
+            'E' => 9.67,
+            'F' => 14.78,
             'G' => 14.22
         ];
     }
@@ -154,20 +168,17 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
                     ],
                 ]);
 
-
                 $sheet->mergeCells('C1:D1');
-                $sheet->mergeCells('F' . ($event->sheet->getHighestRow()) . ':G' . ($event->sheet->getHighestRow()));
 
-                $sheet->getStyle('C1:D1')->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                        'size' => 14,
-                        'color' => ['rgb' => '000000'],
-                    ],
-                    'alignment' => [
-                        'horizontal' => 'center',
-                        'vertical' => 'center',
-                    ],
+                // ✅ 获取 "TOTAL PRICE" 所在的行
+                $totalRow = $event->sheet->getHighestRow();
+
+
+
+                // ✅ 设置 "TOTAL PRICE" 文字 和 总价 都居中
+                $sheet->getStyle('F' . $totalRow . ':G' . $totalRow)->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 12],
+                    'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
                 ]);
 
                 $sheet->getStyle('A8:G8')->applyFromArray([
@@ -177,19 +188,13 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
                     ],
                 ]);
 
-                $totalRow = $event->sheet->getHighestRow();
-                $sheet->getStyle('F' . $totalRow . ':G' . $totalRow)->applyFromArray([
-                    'font' => ['bold' => true, 'size' => 12],
-                    'alignment' => ['horizontal' => 'right', 'vertical' => 'center'],
-                ]);
-
                 $sheet->getStyle('A9:A1000')->getAlignment()->setHorizontal('center'); // Item 居中
-                $sheet->getStyle('B9:B1000')->getAlignment()->setHorizontal('center');   // Description 左对齐
+                $sheet->getStyle('B9:B1000')->getAlignment()->setHorizontal('center'); // Description 居中
                 $sheet->getStyle('C9:C1000')->getAlignment()->setHorizontal('center'); // Consignment Note 居中
                 $sheet->getStyle('D9:D1000')->getAlignment()->setHorizontal('center'); // Delivery Date 居中
                 $sheet->getStyle('E9:E1000')->getAlignment()->setHorizontal('center'); // Qty 居中
-                $sheet->getStyle('F9:F1000')->getAlignment()->setHorizontal('center');  // UOM 右对齐
-                $sheet->getStyle('G9:G1000')->getAlignment()->setHorizontal('center');  // UOM 右对齐
+                $sheet->getStyle('F9:F1000')->getAlignment()->setHorizontal('center'); // UOM 居中
+                $sheet->getStyle('G9:G1000')->getAlignment()->setHorizontal('center'); // Total RM 居中
             }
         ];
     }

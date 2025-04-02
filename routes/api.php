@@ -67,7 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
     Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
     Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
-    Route::get('/manifest/excel/{manifestId}', [ManifestController::class, 'exportManifestExcel']);
+    Route::post('/manifest/excel', [ManifestController::class, 'exportManifest']);
 });
 
 

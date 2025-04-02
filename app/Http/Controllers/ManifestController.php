@@ -29,12 +29,26 @@ class ManifestController extends Controller
 
     // 📌 【2️⃣ 导出 Excel 】
 
-    public function exportManifestExcel($consignor_id)
+    public function exportManifest(Request $request)
     {
-        return Excel::download(new ManifestExcelExport($consignor_id), "Manifest_invoice_{$consignor_id}.xlsx");
+        // 验证请求参数
+        $request->validate([
+            'consignor_id' => 'required|integer',
+            'start_date'   => 'required|date',
+            'end_date'     => 'required|date'
+        ]);
+
+        // 获取参数
+        $consignorId = $request->consignor_id;
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
+
+        // 生成文件名，例如：Manifest_123_20240328.xlsx
+        $filename = "Manifest_invoice{$consignorId}_" . now()->format('Ymd') . ".xlsx";
+
+        // 生成 Excel 并返回下载
+        return Excel::download(new ManifestExcelExport($consignorId, $startDate, $endDate), $filename);
     }
-
-
     public function store(Request $request)
     {
         try {
@@ -138,27 +152,41 @@ class ManifestController extends Controller
     }
 
 
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $manifests = ManifestInfo::with('user:id,name')
-                ->latest() // 按照 created_at 倒序排序，最新的在最前
-                ->get();
+            // 获取 start_date 和 end_date，如果用户没有提供，则不进行日期过滤
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
 
-            return response()->json($manifests->map(function ($manifest) {
-                return [
-                    'id' => $manifest->id,
-                    'date' => $manifest->date,
-                    'awb_no' => $manifest->awb_no,
-                    'to' => $manifest->to,
-                    'from' => $manifest->from,
-                    'flt' => $manifest->flt,
-                    'manifest_no' => $manifest->manifest_no,
-                    'user_id' => $manifest->user_id,
-                    'created_by' => $manifest->user ? $manifest->user->name : null, // ✅ 获取用户名
-                    'created_at' => $manifest->created_at, // 可以让前端看到创建时间
-                ];
-            }), 200);
+            // 获取 per_page 参数，默认 10，允许 10, 20, 50, 100
+            $perPage = $request->input('per_page', 10); // 默认 10
+            $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10; // 只允许特定值
+
+            // 查询数据库
+            $query = ManifestInfo::with('user:id,name')
+                ->latest(); // 按 created_at 倒序排序
+
+            // 如果提供了 start_date 和 end_date，就进行过滤
+            if ($startDate && $endDate) {
+                $query->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            // 分页，每页 $perPage 条
+            $manifests = $query->paginate($perPage);
+
+            // 返回 JSON 数据
+            return response()->json([
+                'data' => $manifests->items(), // 当前页数据
+                'pagination' => [
+                    'total' => $manifests->total(), // 总条数
+                    'per_page' => $manifests->perPage(), // 每页数量
+                    'current_page' => $manifests->currentPage(), // 当前页码
+                    'last_page' => $manifests->lastPage(), // 最后一页
+                    'next_page_url' => $manifests->nextPageUrl(), // 下一页 URL
+                    'prev_page_url' => $manifests->previousPageUrl(), // 上一页 URL
+                ],
+            ], 200);
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Failed to retrieve manifests',

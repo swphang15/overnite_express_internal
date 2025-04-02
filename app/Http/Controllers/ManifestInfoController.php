@@ -265,20 +265,24 @@ class ManifestInfoController extends Controller
 
     public function searchManifest(Request $request)
     {
-        // 验证 consignor_id 必填，start_date 和 end_date 变成可选
+        // 验证 consignor_id 必填，start_date 和 end_date 可选
         $request->validate([
             'consignor_id' => 'required|integer',
             'start_date'   => 'required|date',
             'end_date'     => 'required|date'
         ]);
 
+        // 获取 per_page 参数，默认 10，允许 10, 20, 50, 100
+        $perPage = $request->input('per_page', 10); // 默认 10
+        $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10; // 限制可选值
+
         // 查询数据库
         $query = DB::table('manifest_lists')
             ->where('consignor_id', $request->consignor_id)
             ->select(
                 DB::raw("CONCAT('DCN ', origin, '-', destination) AS Description"),
-                'cn_no as Consignment Note',  // **不能有空格**
-                DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') AS 'Delivery Date' "),
+                'cn_no as Consignment_Note',  // **不能有空格**
+                DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') AS Delivery_Date"),
                 'pcs as Qty',
                 'total_price as Total_RM'
             );
@@ -291,16 +295,24 @@ class ManifestInfoController extends Controller
             $query->whereBetween('created_at', [$start_date, $end_date]);
         }
 
-        // 获取查询结果
-        $manifests = $query->get();
+        // **分页，每页 $perPage 条**
+        $manifests = $query->paginate($perPage);
 
-        // 计算总价格
+        // **计算当前页的总价格**
         $totalPrice = $manifests->sum('Total_RM');
 
-        // 返回 JSON 响应，包含数据 + 总价格
+        // 返回 JSON 响应
         return response()->json([
-            'data' => $manifests,
-            'total_price' => $totalPrice
+            'data' => $manifests->items(), // 只返回当前页数据
+            'total_price' => $totalPrice, // 当前页的总价格
+            'pagination' => [
+                'total' => $manifests->total(), // 总条数
+                'per_page' => $manifests->perPage(), // 每页数量
+                'current_page' => $manifests->currentPage(), // 当前页码
+                'last_page' => $manifests->lastPage(), // 最后一页
+                'next_page_url' => $manifests->nextPageUrl(), // 下一页 URL
+                'prev_page_url' => $manifests->previousPageUrl(), // 上一页 URL
+            ],
         ]);
     }
 }
