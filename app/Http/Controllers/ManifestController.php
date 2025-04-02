@@ -331,8 +331,6 @@ class ManifestController extends Controller
 
 
 
-
-
     /**
      * 计算 total_price
      */
