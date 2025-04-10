@@ -277,9 +277,9 @@ class ManifestInfoController extends Controller
 
         // ✅ 排序字段映射
         $sortByMapping = [
-            'Manifest No'      => 'manifest_infos.manifest_no',
-            'Consignment Note' => 'manifest_lists.cn_no',
-            'Delivery Date'    => 'manifest_lists.created_at',
+            'Manifest_No'      => 'manifest_infos.manifest_no',
+            'Consignment_Note' => 'manifest_lists.cn_no',
+            'Delivery_Date'    => 'manifest_lists.created_at',
         ];
 
         $sortByKey = $request->input('sort_by', 'Delivery Date');
