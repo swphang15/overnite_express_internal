@@ -17,7 +17,7 @@ use App\Http\Controllers\StatsController;
 
 Route::get('dashboard/count', [StatsController::class, 'getCounts']);
 
-
+Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
 
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -57,6 +57,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::post('/manifest', [ManifestController::class, 'store']);
     Route::get('/manifest', [ManifestController::class, 'index']);
     Route::get('/manifest/{id}', [ManifestController::class, 'show']);
+    Route::get('/manifest/{id}/{listId}', [ManifestController::class, 'showOneList']);
+    Route::put('/manifest-list/{id}', [ManifestController::class, 'updateManifestList']);
+
+
+
+
     Route::put('/manifest/{id}', [ManifestController::class, 'update']);
     Route::delete('/manifest/{id}', [ManifestController::class, 'destroy']);
     Route::delete('/manifest-list/{id}', [ManifestController::class, 'destroyManifestList']);
@@ -65,7 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/manifest/list/{id}', [ManifestInfoController::class, 'addLists']);
 
     Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
-    Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
+
+
     Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
     Route::post('/manifest/excel', [ManifestController::class, 'exportManifest']);
 });
@@ -77,7 +84,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/shipping-rates', [ShippingRateController::class, 'index']);
     Route::post('/shipping-rates', [ShippingRateController::class, 'store']);
     Route::get('/shipping-rates/unique', [ShippingRateController::class, 'OAD']);
-    Route::get('/shipping-rates/{id}', [ShippingRateController::class, 'show']);
+    Route::get('/shipping-rates/{shipping_plan_id}/{rate_id}', [ShippingRateController::class, 'show']);
+
+
     Route::put('/shipping-rates/{id}', [ShippingRateController::class, 'update']);
     Route::delete('/shipping-rates/{id}', [ShippingRateController::class, 'destroy']);
     Route::get('/shipping-rates/trashed', [ShippingRateController::class, 'trashed']);
@@ -98,11 +107,11 @@ Route::get('/shipping-rates/destinations', [ShippingController::class, 'getUniqu
 
 
 
-Route::post('/export-excel', [InvoiceExportController::class, 'exportExcel']);
+// Route::post('/export-excel', [InvoiceExportController::class, 'exportExcel']);
 
-Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
-Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
-Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
+// Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
+// Route::post('/manifest/pdf', [InvoiceExportController::class, 'exportPDF']);
+// Route::get('/manifest/pdf/{id}', [InvoiceExportController::class, 'exportPDF']);
 
 
 Route::get('/create_manifest_form_data', [ManifestController::class, 'createManifestFormData']);

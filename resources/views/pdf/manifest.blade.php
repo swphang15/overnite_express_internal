@@ -9,7 +9,7 @@
         body {
             font-family: Arial, sans-serif;
             font-size: 10px;
-            margin: 0;
+            margin: -30px;
             padding: 0;
         }
 
@@ -35,12 +35,12 @@
 
         .company-info {
             text-align: left;
-            font-size: 12px;
+            font-size: 15px;
             font-weight: bold;
         }
 
         .reg-no {
-            font-size: 10px;
+            font-size: 13px;
             font-weight: normal;
         }
 
@@ -66,7 +66,7 @@
     <!-- ✅ 顶部表格（公司信息 + 单号） -->
     <table>
         <tr>
-            <td style="width: 33.5%; text-align: left; vertical-align: middle;">
+            <td style="width: 32.2%; text-align: left; vertical-align: middle;">
                 <table style="border: none; width: 100%;">
                     <tr>
                         <td style="width: 50px; vertical-align: middle; border: none;">
@@ -86,18 +86,37 @@
                 </table>
             </td>
 
-            <td style="width: 11%;">
-                <strong>DATE</strong><br>
-                {{ $date->format('Y-m-d') }}<br>
-                ({{ $date->format('l') }})
+            <td style="width: 10.7%;">
+                <span style="font-size: 14px; font-weight: bold;">DATE</span><br>
+                <span style="font-size: 12px;">{{ $date->format('Y-m-d') }}</span><br>
+                <span style="font-size: 11px;">({{ $date->format('l') }})</span>
             </td>
 
-            <td style="width: 15%;"><strong>AWB No.</strong><br>{{ $manifestInfo->awb_no }}</td>
-            <td style="width: 8%;"><strong>TO</strong><br>{{ $manifestInfo->to }}</td>
-            <td style="width: 8%;"><strong>FROM</strong><br>{{ $manifestInfo->from }}</td>
-            <td style="width: 8%;"><strong>FLT</strong><br>{{ $manifestInfo->flt }}</td>
-            <td style="width: 18.5%;" class="manifest-no"><strong>Manifest
-                    No.</strong><br>{{ $manifestInfo->manifest_no }}</td>
+            <td style="width: 15%;">
+                <span style="font-size: 14px; font-weight: bold;">AWB No.</span><br>
+                <span style="font-size: 12px;">{{ $manifestInfo->awb_no }}</span>
+            </td>
+
+            <td style="width: 8%;">
+                <span style="font-size: 14px; font-weight: bold;">TO</span><br>
+                <span style="font-size: 12px;">{{ $manifestInfo->to }}</span>
+            </td>
+
+            <td style="width: 8%;">
+                <span style="font-size: 14px; font-weight: bold;">FROM</span><br>
+                <span style="font-size: 12px;">{{ $manifestInfo->from }}</span>
+            </td>
+
+            <td style="width: 8%;">
+                <span style="font-size: 15px; font-weight: bold;">FLT</span><br>
+                <span style="font-size: 13px;">{{ $manifestInfo->flt }}</span>
+            </td>
+
+            <td style="width: 18%;" class="manifest-no">
+                <span style="font-size: 14px; font-weight: bold;">Manifest No.</span><br>
+                <span style="font-size: 12px;">{{ $manifestInfo->manifest_no }}</span>
+            </td>
+
         </tr>
     </table>
 

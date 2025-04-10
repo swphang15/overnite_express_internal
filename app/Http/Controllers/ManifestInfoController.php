@@ -262,56 +262,65 @@ class ManifestInfoController extends Controller
         return (float) ($shippingRate->minimum_price + $extraCost);
     }
 
-
     public function searchManifest(Request $request)
     {
-        // 验证 consignor_id 必填，start_date 和 end_date 可选
         $request->validate([
             'consignor_id' => 'required|integer',
             'start_date'   => 'required|date',
-            'end_date'     => 'required|date'
+            'end_date'     => 'required|date',
+            'sort_by'      => 'nullable|string',
+            'sort_order'   => 'nullable|in:asc,desc', // ✅ 新增校验
         ]);
 
-        // 获取 per_page 参数，默认 10，允许 10, 20, 50, 100
-        $perPage = $request->input('per_page', 10); // 默认 10
-        $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10; // 限制可选值
+        $perPage = $request->input('per_page', 10);
+        $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10;
 
-        // 查询数据库
+        // ✅ 排序字段映射
+        $sortByMapping = [
+            'Manifest No'      => 'manifest_infos.manifest_no',
+            'Consignment Note' => 'manifest_lists.cn_no',
+            'Delivery Date'    => 'manifest_lists.created_at',
+        ];
+
+        $sortByKey = $request->input('sort_by', 'Delivery Date');
+        $sortBy = $sortByMapping[$sortByKey] ?? 'manifest_lists.created_at';
+
+        // ✅ 新增支持前端传入 sort_order（默认为 desc）
+        $sortOrder = $request->input('sort_order', 'desc');
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
+
         $query = DB::table('manifest_lists')
-            ->where('consignor_id', $request->consignor_id)
+            ->join('manifest_infos', 'manifest_lists.manifest_info_id', '=', 'manifest_infos.id')
+            ->where('manifest_lists.consignor_id', $request->consignor_id)
             ->select(
-                DB::raw("CONCAT('DCN ', origin, '-', destination) AS Description"),
-                'cn_no as Consignment_Note',  // **不能有空格**
-                DB::raw("DATE_FORMAT(created_at, '%d-%m-%Y') AS Delivery_Date"),
-                'pcs as Qty',
-                'total_price as Total_RM'
+                'manifest_infos.manifest_no AS Manifest_No',
+                DB::raw("CONCAT(manifest_lists.origin, '-', manifest_lists.destination) AS Description"),
+                'manifest_lists.cn_no AS Consignment_Note',
+                DB::raw("DATE_FORMAT(manifest_lists.created_at, '%d-%m-%Y') AS Delivery_Date"),
+                'manifest_lists.pcs AS Qty',
+                'manifest_lists.total_price AS Total_RM'
             );
 
-        // 如果有 start_date 和 end_date，则加上日期范围过滤
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $start_date = $request->start_date . " 00:00:00";
-            $end_date = $request->end_date . " 23:59:59"; // **确保包含完整一天的数据**
+            $end_date = $request->end_date . " 23:59:59";
 
-            $query->whereBetween('created_at', [$start_date, $end_date]);
+            $query->whereBetween('manifest_lists.created_at', [$start_date, $end_date]);
         }
 
-        // **分页，每页 $perPage 条**
+        $query->orderBy($sortBy, $sortOrder); // ✅ 动态排序
+
         $manifests = $query->paginate($perPage);
 
-        // **计算当前页的总价格**
-        $totalPrice = $manifests->sum('Total_RM');
-
-        // 返回 JSON 响应
         return response()->json([
-            'data' => $manifests->items(), // 只返回当前页数据
-            'total_price' => $totalPrice, // 当前页的总价格
+            'data' => $manifests->items(),
             'pagination' => [
-                'total' => $manifests->total(), // 总条数
-                'per_page' => $manifests->perPage(), // 每页数量
-                'current_page' => $manifests->currentPage(), // 当前页码
-                'last_page' => $manifests->lastPage(), // 最后一页
-                'next_page_url' => $manifests->nextPageUrl(), // 下一页 URL
-                'prev_page_url' => $manifests->previousPageUrl(), // 上一页 URL
+                'total' => $manifests->total(),
+                'per_page' => $manifests->perPage(),
+                'current_page' => $manifests->currentPage(),
+                'last_page' => $manifests->lastPage(),
+                'next_page_url' => $manifests->nextPageUrl(),
+                'prev_page_url' => $manifests->previousPageUrl(),
             ],
         ]);
     }

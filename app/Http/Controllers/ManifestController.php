@@ -163,6 +163,9 @@ class ManifestController extends Controller
             $perPage = $request->input('per_page', 10); // 默认 10
             $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10; // 只允许特定值
 
+            // 获取搜索条件
+            $search = $request->input('search');
+
             // 查询数据库
             $query = ManifestInfo::with('user:id,name')
                 ->latest(); // 按 created_at 倒序排序
@@ -170,6 +173,21 @@ class ManifestController extends Controller
             // 如果提供了 start_date 和 end_date，就进行过滤
             if ($startDate && $endDate) {
                 $query->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            // 如果提供了 search 条件，就进行模糊搜索
+            if ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('manifest_no', 'like', "%$search%")
+                        ->orWhere('date', 'like', "%$search%")
+                        ->orWhere('awb_no', 'like', "%$search%")
+                        ->orWhere('to', 'like', "%$search%")
+                        ->orWhere('from', 'like', "%$search%")
+                        ->orWhere('flt', 'like', "%$search%")
+                        ->orWhereHas('user', function ($q) use ($search) {
+                            $q->where('name', 'like', "%$search%");
+                        });
+                });
             }
 
             // 分页，每页 $perPage 条
@@ -194,6 +212,8 @@ class ManifestController extends Controller
             ], 500);
         }
     }
+
+
 
 
 
@@ -242,6 +262,52 @@ class ManifestController extends Controller
         }
     }
 
+    public function showOneList($id, $listId)
+    {
+        try {
+            $manifestInfo = ManifestInfo::with(['manifestLists' => function ($query) use ($listId) {
+                $query->where('id', $listId);
+            }, 'manifestLists.client'])->findOrFail($id);
+
+            // 如果没有匹配的 list
+            if ($manifestInfo->manifestLists->isEmpty()) {
+                return response()->json(['message' => 'Manifest list not found'], 404);
+            }
+
+            $list = $manifestInfo->manifestLists->first();
+
+            // 合并 kg 和 gram，移除 gram 字段
+            $list->kg = $list->kg + ($list->gram / 1000);
+            unset($list->gram);
+
+            $data = [
+                'id' => $list->id,
+                'manifest_info_id' => $list->manifest_info_id,
+                'consignor_id' => $list->consignor_id,
+                'consignor_name' => $list->client->name ?? null,
+                'consignee_name' => $list->consignee_name,
+                'cn_no' => $list->cn_no,
+                'pcs' => $list->pcs,
+                'kg' => $list->kg,
+                'remarks' => $list->remarks,
+                'total_price' => $list->total_price,
+                'discount' => $list->discount,
+                'origin' => $list->origin,
+                'destination' => $list->destination,
+                'created_at' => $list->created_at,
+                'updated_at' => $list->updated_at,
+                'deleted_at' => $list->deleted_at
+            ];
+
+            return response()->json($data, 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Manifest not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Something went wrong', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+
 
     public function update(Request $request, $id)
     {
@@ -277,6 +343,75 @@ class ManifestController extends Controller
             ], 500);
         }
     }
+    public function updateManifestList(Request $request, $id)
+    {
+        try {
+            $validatedData = $request->validate([
+                'consignor_id' => 'required|exists:clients,id',
+                'consignee_name' => 'required|string',
+                'cn_no' => 'required|numeric',
+                'pcs' => 'required|integer|min:1',
+                'kg' => 'required|numeric|min:0',
+                'origin' => 'required|string',
+                'destination' => 'required|string',
+                'remarks' => 'nullable|string'
+            ]);
+
+            $manifestList = ManifestList::findOrFail($id);
+
+            // 检查 cn_no 是否唯一（排除自己）
+            $duplicate = ManifestList::where('cn_no', $validatedData['cn_no'])
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($duplicate) {
+                $warning = "CN No: {$validatedData['cn_no']} already exists, total_price set to 0";
+                $totalPrice = 0;
+            } else {
+                $totalPrice = $this->calculateTotalPrice(
+                    $validatedData['origin'],
+                    $validatedData['destination'],
+                    $validatedData['consignor_id'],
+                    $validatedData['kg']
+                );
+                $warning = null;
+            }
+
+            $manifestList->update([
+                'consignor_id' => $validatedData['consignor_id'],
+                'consignee_name' => $validatedData['consignee_name'],
+                'cn_no' => $validatedData['cn_no'],
+                'pcs' => $validatedData['pcs'],
+                'kg' => floor($validatedData['kg']),
+                'gram' => round(($validatedData['kg'] - floor($validatedData['kg'])) * 1000),
+                'total_price' => number_format($totalPrice, 2, '.', ''),
+                'origin' => $validatedData['origin'],
+                'destination' => $validatedData['destination'],
+                'remarks' => $validatedData['remarks'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => 'Manifest list updated successfully',
+                'data' => $manifestList,
+                'warning' => $warning
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Manifest list not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
 
     public function destroy($id)

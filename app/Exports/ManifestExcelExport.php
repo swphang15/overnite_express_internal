@@ -87,40 +87,47 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         $exportNo = $this->generateExportNo();
         $exportDate = Carbon::now()->format('d-m-Y');
 
-        // **Excel 头部**
-        $data[] = ["", "", "INVOICE", "", "", "No.", ": $exportNo"];
-        $data[] = [$consignorName, "", "", "", "", "Your Ref.", ":"];
-        $data[] = ["", "", "", "", "", "Our D/O No.", ":"];
-        $data[] = ["CLIENT / DESTINATION", "", "", "", "", "Terms", ":"];
-        $data[] = ["", "", "", "", "", "Date", ": $exportDate"];
-        $data[] = ["TEL : ____________", "", "FAX : ____________", "", "", "Page", ":"];
+        // Excel Header
+        $data[] = ["", "", "", "", "INVOICE", "", "", "No.", ": $exportNo"];
+        $data[] = [$consignorName, "", "", "", "", "", "", "Your Ref.", ":"];
+        $data[] = ["", "", "", "", "", "", "", "Our D/O No.", ":"];
+        $data[] = ["CLIENT / DESTINATION", "", "", "", "", "", "", "Terms", ": C.O.D"];
+        $data[] = ["", "", "", "", "", "", "", "Date", ": $exportDate"];
+        $data[] = ["TEL : ____________", "", "FAX : ____________", "", "", "", "", "Page", ":"];
         $data[] = [""]; // 空行
-        $data[] = ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "UOM", "Total RM"];
 
-        // **数据内容**
+        // 表头
+        $data[] = ["Item", "Manifest No", "Description", "Consignment Note", "Delivery Date", "Qty", "Weight", "UOM", "Total RM"];
+
+        // 数据内容
         $counter = 1;
         foreach ($manifestData as $row) {
-            // 确保 `total_price` 存在且为数字
             $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
             $totalPrice += $rowTotal;
 
-            $data[] = array_pad([
-                $counter++, // Item 递增
-                "DCN " . $row->origin . " - " . $row->destination, // Description
-                $row->cn_no, // Consignment Note
-                Carbon::parse($row->created_at)->format('d-m-Y'), // Delivery Date
-                $row->pcs, // Qty
-                "KG", // UOM
-                number_format($rowTotal, 2) // Total RM
-            ], 7, ""); // 确保数据有 7 列，防止列错位
+            $weight = floatval($row->kg) + (floatval($row->gram) / 1000);
+            $manifestNo = DB::table('manifest_infos')->where('id', $row->manifest_info_id)->value('manifest_no');
+
+            $data[] = [
+                $counter++,
+                $manifestNo ?? "N/A",
+                $row->origin . " - " . $row->destination,
+                $row->cn_no,
+                Carbon::parse($row->created_at)->format('d-m-Y'),
+                intval($row->pcs),
+                number_format((float) $weight, 2, '.', ''),
+                "KG",
+                number_format((float) $rowTotal, 2, '.', '')
+            ];
         }
 
-        // **添加 Total Price 行**
-        $data[] = ["", "", "", "", "", "", ""]; // ✅ 插入空行
-        $data[] = ["", "", "", "",  "", "TOTAL PRICE:", number_format($totalPrice, 2)];
+        // Total Price
+        $data[] = ["", "", "", "", "", "", "", "", ""]; // 空行
+        $data[] = ["", "", "", "", "", "", "", "TOTAL PRICE:", number_format((float) $totalPrice, 2, '.', '')];
 
         return new Collection($data);
     }
+
 
 
     public function headings(): array
@@ -131,21 +138,23 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
     public function styles(Worksheet $sheet)
     {
         return [
-            1  => ['font' => ['bold' => true, 'size' => 14]],
-            8  => ['font' => ['bold' => true]],
+            1 => ['font' => ['bold' => true, 'size' => 14]],
+            8 => ['font' => ['bold' => true]],
         ];
     }
 
     public function columnWidths(): array
     {
         return [
-            'A' => 5.56,
-            'B' => 16.44,
-            'C' => 21.00,
-            'D' => 13.44,
-            'E' => 9.67,
-            'F' => 14.78,
-            'G' => 14.22
+            'A' => 4.3,
+            'B' => 13.56,
+            'C' => 9.78,
+            'D' => 16.33,
+            'E' => 11.89,
+            'F' => 6.00,
+            'G' => 8.78,
+            'H' => 11.23,
+            'I' => 14.00
         ];
     }
 
@@ -154,8 +163,16 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
+
+                // 设置左边距
+                $sheet->getPageMargins()->setLeft(0.52);
+
+                // 设置表头样式（第8行）
                 $sheet->getRowDimension(8)->setRowHeight(22.90);
-                $sheet->getStyle('A8:G8')->applyFromArray([
+                $sheet->getStyle('A8:I8')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                    ],
                     'borders' => [
                         'top' => [
                             'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THICK,
@@ -166,35 +183,46 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
                             'color' => ['rgb' => '000000'],
                         ],
                     ],
-                ]);
-
-                $sheet->mergeCells('C1:D1');
-
-                // ✅ 获取 "TOTAL PRICE" 所在的行
-                $totalRow = $event->sheet->getHighestRow();
-
-
-
-                // ✅ 设置 "TOTAL PRICE" 文字 和 总价 都居中
-                $sheet->getStyle('F' . $totalRow . ':G' . $totalRow)->applyFromArray([
-                    'font' => ['bold' => true, 'size' => 12],
-                    'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
-                ]);
-
-                $sheet->getStyle('A8:G8')->applyFromArray([
                     'alignment' => [
                         'horizontal' => 'center',
                         'vertical' => 'center',
                     ],
                 ]);
 
-                $sheet->getStyle('A9:A1000')->getAlignment()->setHorizontal('center'); // Item 居中
-                $sheet->getStyle('B9:B1000')->getAlignment()->setHorizontal('center'); // Description 居中
-                $sheet->getStyle('C9:C1000')->getAlignment()->setHorizontal('center'); // Consignment Note 居中
-                $sheet->getStyle('D9:D1000')->getAlignment()->setHorizontal('center'); // Delivery Date 居中
-                $sheet->getStyle('E9:E1000')->getAlignment()->setHorizontal('center'); // Qty 居中
-                $sheet->getStyle('F9:F1000')->getAlignment()->setHorizontal('center'); // UOM 居中
-                $sheet->getStyle('G9:G1000')->getAlignment()->setHorizontal('center'); // Total RM 居中
+                // 合并 E1:F1 为 INVOICE 标题栏，并左对齐
+                $sheet->mergeCells('E1:F1');
+                $sheet->getStyle('E1')->getAlignment()->setHorizontal('left');
+
+                // 设置数字格式（Weight => G列，Total RM => I列）
+                $sheet->getStyle('G9:G1000')->getNumberFormat()->setFormatCode('0.00'); // Weight
+                $sheet->getStyle('I9:I1000')->getNumberFormat()->setFormatCode('0.00'); // Total RM
+
+                // 获取 TOTAL PRICE 所在行（最后一行）
+                $totalRow = $event->sheet->getHighestRow();
+
+                // 明确设置 TOTAL PRICE label 样式（H列）
+                $sheet->getStyle("H{$totalRow}")->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 12],
+                    'alignment' => ['horizontal' => 'right', 'vertical' => 'center'],
+                ]);
+
+                // 设置 TOTAL PRICE 数值样式（I列）
+                $sheet->getStyle("I{$totalRow}")->applyFromArray([
+                    'font' => ['bold' => true, 'size' => 12],
+                    'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
+                ]);
+
+                // 强制 TOTAL PRICE 的金额格式为 0.00
+                $sheet->getStyle("I{$totalRow}")->getNumberFormat()->setFormatCode('0.00');
+
+                // 所有数据列居中对齐（第9行起到 TOTAL 行）
+                foreach (range('A', 'I') as $col) {
+                    $sheet->getStyle("{$col}9:{$col}{$totalRow}")->getAlignment()->setHorizontal('center');
+                }
+
+                // ✅ 可选调试：查看 TOTAL PRICE 的值
+                // \Log::info("H{$totalRow}: " . $sheet->getCell("H{$totalRow}")->getValue());
+                // \Log::info("I{$totalRow}: " . $sheet->getCell("I{$totalRow}")->getValue());
             }
         ];
     }

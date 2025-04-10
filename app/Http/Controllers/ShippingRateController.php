@@ -49,15 +49,20 @@ class ShippingRateController extends Controller
     }
 
     // 获取单个 Shipping Rate
-    public function show($id)
+    public function show($shipping_plan_id, $rate_id)
     {
-        $rate = ShippingRate::find($id);
+        // 先找该 shipping_plan_id 下有没有这个 rate_id 的记录
+        $rate = ShippingRate::where('shipping_plan_id', $shipping_plan_id)
+            ->where('id', $rate_id)
+            ->first();
+
         if (!$rate) {
-            return response()->json(['message' => 'Shipping Rate not found'], 404);
+            return response()->json(['message' => 'Shipping Rate not found under this Shipping Plan'], 404);
         }
 
         return response()->json($rate, 200);
     }
+
 
     // 更新 Shipping Rate
     public function update(Request $request, $id)
@@ -68,7 +73,6 @@ class ShippingRateController extends Controller
         }
 
         $request->validate([
-            'shipping_plan_id' => 'sometimes|exists:shipping_plans,id',
             'origin' => 'sometimes|string|max:3',
             'destination' => 'sometimes|string|max:3',
             'minimum_price' => 'sometimes|numeric|min:0',
@@ -76,20 +80,33 @@ class ShippingRateController extends Controller
             'additional_price_per_kg' => 'sometimes|numeric|min:0',
         ]);
 
-        // 检查是否有相同的 origin 和 destination，但排除当前 id
-        $exists = ShippingRate::where('origin', $request->origin)
-            ->where('destination', $request->destination)
-            ->where('id', '!=', $id) // 排除当前记录
-            ->exists();
+        // 获取当前 shipping plan id
+        $shippingPlanId = $rate->shipping_plan_id;
 
-        if ($exists) {
-            return response()->json(['message' => 'This shipping route already exists.'], 422);
+        // 如果前端传了 origin 或 destination，就检查是否冲突
+        if ($request->has('origin') && $request->has('destination')) {
+            $exists = ShippingRate::where('origin', $request->origin)
+                ->where('destination', $request->destination)
+                ->where('shipping_plan_id', $shippingPlanId)
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($exists) {
+                return response()->json(['message' => 'This shipping route already exists in this shipping plan.'], 422);
+            }
         }
 
-        $rate->update($request->all());
+        $rate->update($request->except('shipping_plan_id'));
 
-        return response()->json($rate, 200);
+        return response()->json([
+            'message' => 'Shipping Rate updated successfully.',
+            'rate' => $rate,
+            'shipping_plan_id' => $shippingPlanId,
+        ], 200);
     }
+
+
+
 
     // 软删除 Shipping Rate
     public function destroy($id)
