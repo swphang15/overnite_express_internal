@@ -14,10 +14,16 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ShippingPlanController;
 use App\Http\Controllers\ShippingRateController;
 use App\Http\Controllers\StatsController;
+use App\Http\Controllers\DBBackupController;
+
+Route::middleware('auth:sanctum')->post('/db-backup', [DBBackupController::class, 'download']);
+
 
 Route::get('dashboard/count', [StatsController::class, 'getCounts']);
-
+Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
 Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
+
+
 
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -73,7 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
 
 
-    Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
+
     Route::post('/manifest/excel', [ManifestController::class, 'exportManifest']);
 });
 

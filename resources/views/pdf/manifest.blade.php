@@ -9,7 +9,7 @@
         body {
             font-family: Arial, sans-serif;
             font-size: 10px;
-            margin: -30px;
+            margin: -35px;
             padding: 0;
         }
 
@@ -35,12 +35,12 @@
 
         .company-info {
             text-align: left;
-            font-size: 15px;
+            font-size: 184%;
             font-weight: bold;
         }
 
         .reg-no {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: normal;
         }
 
@@ -52,6 +52,21 @@
         .left-align {
             text-align: left;
             padding-left: 5px;
+        }
+
+
+        .header-text {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .data-text {
+            font-size: 14px;
+        }
+
+        .summary-text {
+            font-size: 14px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -66,7 +81,7 @@
     <!-- ✅ 顶部表格（公司信息 + 单号） -->
     <table>
         <tr>
-            <td style="width: 32.2%; text-align: left; vertical-align: middle;">
+            <td style="width: 32%; text-align: left; vertical-align: middle;">
                 <table style="border: none; width: 100%;">
                     <tr>
                         <td style="width: 50px; vertical-align: middle; border: none;">
@@ -86,25 +101,25 @@
                 </table>
             </td>
 
-            <td style="width: 10.7%;">
-                <span style="font-size: 14px; font-weight: bold;">DATE</span><br>
-                <span style="font-size: 12px;">{{ $date->format('Y-m-d') }}</span><br>
-                <span style="font-size: 11px;">({{ $date->format('l') }})</span>
+            <td style="width: 12%;">
+                <span style="font-size: 15px; font-weight: bold;">DATE</span><br>
+                <span style="font-size: 13px;">{{ $date->format('Y-m-d') }}</span><br>
+                <span style="font-size: 13px;">({{ $date->format('l') }})</span>
             </td>
 
-            <td style="width: 15%;">
-                <span style="font-size: 14px; font-weight: bold;">AWB No.</span><br>
-                <span style="font-size: 12px;">{{ $manifestInfo->awb_no }}</span>
-            </td>
-
-            <td style="width: 8%;">
-                <span style="font-size: 14px; font-weight: bold;">TO</span><br>
-                <span style="font-size: 12px;">{{ $manifestInfo->to }}</span>
+            <td style="width: 14%;">
+                <span style="font-size: 15px; font-weight: bold;">AWB No.</span><br>
+                <span style="font-size: 13px;">{{ $manifestInfo->awb_no }}</span>
             </td>
 
             <td style="width: 8%;">
-                <span style="font-size: 14px; font-weight: bold;">FROM</span><br>
-                <span style="font-size: 12px;">{{ $manifestInfo->from }}</span>
+                <span style="font-size: 15px; font-weight: bold;">TO</span><br>
+                <span style="font-size: 13px;">{{ $manifestInfo->to }}</span>
+            </td>
+
+            <td style="width: 8%;">
+                <span style="font-size: 15px; font-weight: bold;">FROM</span><br>
+                <span style="font-size: 13px;">{{ $manifestInfo->from }}</span>
             </td>
 
             <td style="width: 8%;">
@@ -113,8 +128,8 @@
             </td>
 
             <td style="width: 18%;" class="manifest-no">
-                <span style="font-size: 14px; font-weight: bold;">Manifest No.</span><br>
-                <span style="font-size: 12px;">{{ $manifestInfo->manifest_no }}</span>
+                <span style="font-size: 15px; font-weight: bold;">Manifest No.</span><br>
+                <span style="font-size: 13px;">{{ $manifestInfo->manifest_no }}</span>
             </td>
 
         </tr>
@@ -123,13 +138,13 @@
     <!-- ✅ 主表格（数据部分） -->
     <table>
         <thead>
-            <tr>
+            <tr class="header-text">
                 <th style="width: 5%;">No</th>
                 <th style="width: 8%;">Origin</th>
-                <th style="width: 8%;">Destination</th> <!-- ✅ 新增 Destination -->
+                <th style="width: 8%;">Destination</th>
                 <th style="width: 11%;">Consignor</th>
-                <th style="width: 11%;">Consignee</th>
-                <th style="width: 15%;">CN No</th>
+                <th style="width: 12%;">Consignee</th>
+                <th style="width: 14%;">CN No</th>
                 <th style="width: 8%;">PCS</th>
                 <th style="width: 8%;">KG</th>
                 <th style="width: 8%;">GM</th>
@@ -138,40 +153,38 @@
         </thead>
         <tbody>
             @foreach ($manifestLists as $index => $list)
-                <tr>
+                <tr class="data-text">
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $list->origin }}</td>
-                    <td>{{ $list->destination }}</td> <!-- ✅ 新增 Destination -->
+                    <td>{{ $list->destination }}</td>
                     <td>{{ $list->consignor->name }}</td>
                     <td>{{ $list->consignee_name }}</td>
                     <td>{{ $list->cn_no }}</td>
                     <td>{{ $list->pcs }}</td>
                     <td>{{ $list->kg }}</td>
                     <td>{{ $list->gram }}</td>
-                    <td style="width: 5%;"></td>
-                    <td style="width: 5%;"></td>
-                    <td style="width: 5%;"></td>
-                    <td style="width: 5%;"></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
                 </tr>
             @endforeach
 
-            <!-- ✅ 最后一行：计算 Manifest Weight & Total PCS -->
-            <tr>
-                <td></td> <!-- No 列空白 -->
-                <td colspan="3" style="text-align: center; font-weight: bold;">Manifest Weight:</td>
+            <!-- ✅ 总结行 -->
+            <tr class="summary-text">
+                <td></td>
+                <td colspan="3" style="text-align: center;">Manifest Weight:</td>
                 <td colspan="1" style="text-align: center;">
                     {{ number_format($manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000, 2) }} KG
                 </td>
-
-                <td colspan="1" style="text-align: center; font-weight: bold;">Total PCS:</td>
+                <td colspan="1" style="text-align: center;">Total PCS:</td>
                 <td colspan="1" style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td>
-                <td colspan="2" style="text-align: center; font-weight: bold;">AWB WEIGHT:</td>
-                <td colspan="1"></td> <!-- 让出位置，避免错位 -->
+                <td colspan="2" style="text-align: center;">AWB WEIGHT:</td>
+                <td colspan="1"></td>
                 <td colspan="1"></td>
                 <td colspan="1"></td>
                 <td colspan="1"></td>
             </tr>
-
         </tbody>
     </table>
 

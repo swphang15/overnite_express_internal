@@ -269,23 +269,23 @@ class ManifestInfoController extends Controller
             'start_date'   => 'required|date',
             'end_date'     => 'required|date',
             'sort_by'      => 'nullable|string',
-            'sort_order'   => 'nullable|in:asc,desc', // ✅ 新增校验
+            'sort_order'   => 'nullable|in:asc,desc',
         ]);
 
         $perPage = $request->input('per_page', 10);
         $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10;
 
-        // ✅ 排序字段映射
+        // ✅ 统一使用 snake_case 做排序 key
         $sortByMapping = [
-            'Manifest_No'      => 'manifest_infos.manifest_no',
-            'Consignment_Note' => 'manifest_lists.cn_no',
-            'Delivery_Date'    => 'manifest_lists.created_at',
+            'manifest_no'      => 'manifest_infos.manifest_no',
+            'consignment_note' => 'manifest_lists.cn_no',
+            'delivery_date'    => 'manifest_lists.created_at',
         ];
 
-        $sortByKey = $request->input('sort_by', 'Delivery Date');
+        // ✅ 转换用户传入 sort_by，例如 "Consignment Note" → "consignment_note"
+        $sortByKey = strtolower(str_replace([' ', '-'], '_', $request->input('sort_by', 'delivery_date')));
         $sortBy = $sortByMapping[$sortByKey] ?? 'manifest_lists.created_at';
 
-        // ✅ 新增支持前端传入 sort_order（默认为 desc）
         $sortOrder = $request->input('sort_order', 'desc');
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
 
@@ -308,7 +308,7 @@ class ManifestInfoController extends Controller
             $query->whereBetween('manifest_lists.created_at', [$start_date, $end_date]);
         }
 
-        $query->orderBy($sortBy, $sortOrder); // ✅ 动态排序
+        $query->orderBy($sortBy, $sortOrder);
 
         $manifests = $query->paginate($perPage);
 
