@@ -18,5 +18,5 @@ class Client extends Model
     return $this->belongsTo(ShippingPlan::class, 'shipping_plan_id')->withTrashed();
 }
 
-    
+
 }

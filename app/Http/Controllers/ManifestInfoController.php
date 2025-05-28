@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -26,10 +27,10 @@ class ManifestInfoController extends Controller
                 'destination' => 'required|string',
                 'consignor_id' => 'required|exists:clients,id',
                 'kg' => 'required|numeric|min:0',
-                'cn_no' => 'required|numeric', // 添加 CN No 检查
+                'cn_no' => 'required|numeric',
             ]);
 
-            // 检查 CN No 是否已经存在
+            // 检查 CN No 是否已存在
             $existingManifest = ManifestList::where('cn_no', $validatedData['cn_no'])->exists();
 
             if ($existingManifest) {
@@ -39,7 +40,30 @@ class ManifestInfoController extends Controller
                 ], 200);
             }
 
-            $totalPrice = $this->calculateTotalPrice(
+            // 获取 consignor 信息，并检查是否有有效的 shipping plan
+            $consignor = Client::findOrFail($validatedData['consignor_id']);
+            $shippingPlanId = $consignor->shipping_plan_id;
+
+            if (!$shippingPlanId) {
+                return response()->json([
+                    'message' => 'Consignor does not have a shipping plan assigned.'
+                ], 400);
+            }
+
+            // 检查是否存在有效的 shipping rate
+            $routeExists = ShippingRate::where('shipping_plan_id', $shippingPlanId)
+                ->where('origin', $validatedData['origin'])
+                ->where('destination', $validatedData['destination'])
+                ->exists();
+
+            if (!$routeExists) {
+                return response()->json([
+                    'message' => 'Route not found. Please double-check the origin and destination you have selected.'
+                ], 400);
+            }
+
+            // ====== 新版：修改 calculateTotalPrice 返回结构 ======
+            $priceDetails = $this->calculateTotalPriceDetailed(
                 $validatedData['origin'],
                 $validatedData['destination'],
                 $validatedData['consignor_id'],
@@ -47,7 +71,9 @@ class ManifestInfoController extends Controller
             );
 
             return response()->json([
-                'estimated_total_price' => number_format($totalPrice, 2, '.', '')
+                'base_price' => number_format($priceDetails['base_price'], 2, '.', ''),
+                'misc_charge' => number_format($priceDetails['misc_charge'], 2, '.', ''),
+                'estimated_total_price' => number_format($priceDetails['total'], 2, '.', ''),
             ], 200);
         } catch (ValidationException $e) {
             return response()->json([
@@ -61,6 +87,7 @@ class ManifestInfoController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * 创建 Manifest
@@ -105,8 +132,8 @@ class ManifestInfoController extends Controller
                 'manifest_lists.*.destination' => 'required|string',
                 'manifest_lists.*.remarks' => 'nullable|string',
                 'manifest_lists.*.total_price' => isset($request->manifest_info_id)
-                    ? 'prohibited' // 追加时 total_price 不能提供
-                    : 'required|numeric|min:0' // 创建时 total_price 必须提供
+                    ? 'prohibited'
+                    : 'required|numeric|min:0'
             ]);
 
             $userId = Auth::id();
@@ -114,7 +141,6 @@ class ManifestInfoController extends Controller
             $nextManifestNo = $this->getNextManifestNo($maxManifestNo);
 
             if (!isset($validatedData['manifest_info_id'])) {
-                // 创建 ManifestInfo
                 $manifestInfo = ManifestInfo::create([
                     'date' => $validatedData['date'],
                     'awb_no' => $validatedData['awb_no'],
@@ -125,33 +151,33 @@ class ManifestInfoController extends Controller
                     'user_id' => $userId,
                 ]);
             } else {
-                // 获取已有 ManifestInfo
                 $manifestInfo = ManifestInfo::findOrFail($validatedData['manifest_info_id']);
             }
 
-            // 处理 ManifestList
             $warningMessages = [];
+
             $manifestLists = collect($validatedData['manifest_lists'])->map(function ($list) use ($manifestInfo, $validatedData, &$warningMessages) {
-                // 检查 `cn_no` 是否已存在
                 $existingManifest = ManifestList::where('cn_no', $list['cn_no'])->exists();
 
                 if ($existingManifest) {
-                    // `cn_no` 已存在，提醒用户
                     $warningMessages[] = "CN No: {$list['cn_no']} already exists, the total price will be set to 0";
                     $totalPrice = 0;
                 } else {
-                    // `cn_no` 不存在，处理价格
                     if (isset($validatedData['manifest_info_id'])) {
-                        $totalPrice = $this->calculateTotalPrice(
+                        $totalDetails = $this->calculateTotalPriceDetailed(
                             $list['origin'],
                             $list['destination'],
                             $list['consignor_id'],
                             $list['kg']
                         );
+                        $totalPrice = $totalDetails['total'];
                     } else {
                         $totalPrice = $list['total_price'];
                     }
                 }
+
+                // ✅ 正确抓取 misc_charge
+                $miscCharge = $this->getMiscCharge($list['consignor_id'], $list['origin'], $list['destination']);
 
                 return [
                     'manifest_info_id' => $manifestInfo->id,
@@ -166,6 +192,7 @@ class ManifestInfoController extends Controller
                     'origin' => $list['origin'],
                     'destination' => $list['destination'],
                     'remarks' => $list['remarks'] ?? null,
+                    'misc_charge' => number_format($miscCharge, 2, '.', ''),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -174,6 +201,7 @@ class ManifestInfoController extends Controller
             ManifestList::insert($manifestLists);
 
             DB::commit();
+
             return response()->json([
                 'message' => isset($validatedData['manifest_info_id']) ? 'Manifest updated successfully' : 'Manifest created successfully',
                 'manifest_info' => $manifestInfo,
@@ -200,6 +228,23 @@ class ManifestInfoController extends Controller
             ], 500);
         }
     }
+    private function getMiscCharge($consignorId, $origin, $destination)
+    {
+        $client = \App\Models\Client::find($consignorId);
+        if (!$client || !$client->shipping_plan_id) {
+            return 0.00;
+        }
+
+        $shippingRate = DB::table('shipping_rates')
+            ->where('shipping_plan_id', $client->shipping_plan_id)
+            ->where('origin', $origin)
+            ->where('destination', $destination)
+            ->first();
+
+        return $shippingRate ? $shippingRate->misc_charge : 0.00;
+    }
+
+
 
     public function getCnNumbers($consignor_id)
     {
@@ -233,11 +278,11 @@ class ManifestInfoController extends Controller
     }
 
 
-    private function calculateTotalPrice($from, $to, $consignorId, $kg)
+    private function calculateTotalPriceDetailed($from, $to, $consignorId, $kg)
     {
         $client = Client::find($consignorId);
         if (!$client) {
-            return 0;
+            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
         }
 
         $from = strtoupper($from);
@@ -249,18 +294,29 @@ class ManifestInfoController extends Controller
             ->first();
 
         if (!$shippingRate) {
-            return 0;
+            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
         }
 
+        // 🚚 关键修改点：超重部分向上取整计算
         if ($kg <= $shippingRate->minimum_weight) {
-            return (float) $shippingRate->minimum_price;
+            $basePrice = $shippingRate->minimum_price;
+        } else {
+            $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
+            $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+            $basePrice = $shippingRate->minimum_price + $extraCost;
         }
 
-        $extraWeight = $kg - $shippingRate->minimum_weight;
-        $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+        $miscCharge = $shippingRate->misc_charge ?? 0;
+        $total = $basePrice + $miscCharge;
 
-        return (float) ($shippingRate->minimum_price + $extraCost);
+        return [
+            'base_price' => (float) $basePrice,
+            'misc_charge' => (float) $miscCharge,
+            'total' => (float) $total,
+        ];
     }
+
+
 
     public function searchManifest(Request $request)
     {
@@ -268,47 +324,31 @@ class ManifestInfoController extends Controller
             'consignor_id' => 'required|integer',
             'start_date'   => 'required|date',
             'end_date'     => 'required|date',
-            'sort_by'      => 'nullable|string',
-            'sort_order'   => 'nullable|in:asc,desc',
         ]);
 
         $perPage = $request->input('per_page', 10);
         $perPage = in_array($perPage, [10, 20, 50, 100]) ? $perPage : 10;
-
-        // ✅ 统一使用 snake_case 做排序 key
-        $sortByMapping = [
-            'manifest_no'      => 'manifest_infos.manifest_no',
-            'consignment_note' => 'manifest_lists.cn_no',
-            'delivery_date'    => 'manifest_lists.created_at',
-        ];
-
-        // ✅ 转换用户传入 sort_by，例如 "Consignment Note" → "consignment_note"
-        $sortByKey = strtolower(str_replace([' ', '-'], '_', $request->input('sort_by', 'delivery_date')));
-        $sortBy = $sortByMapping[$sortByKey] ?? 'manifest_lists.created_at';
-
-        $sortOrder = $request->input('sort_order', 'desc');
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'desc';
-
         $query = DB::table('manifest_lists')
             ->join('manifest_infos', 'manifest_lists.manifest_info_id', '=', 'manifest_infos.id')
             ->where('manifest_lists.consignor_id', $request->consignor_id)
+            ->whereNull('manifest_lists.deleted_at')
+            ->whereNull('manifest_infos.deleted_at')
             ->select(
                 'manifest_infos.manifest_no AS Manifest_No',
                 DB::raw("CONCAT(manifest_lists.origin, '-', manifest_lists.destination) AS Description"),
                 'manifest_lists.cn_no AS Consignment_Note',
-                DB::raw("DATE_FORMAT(manifest_lists.created_at, '%d-%m-%Y') AS Delivery_Date"),
+                DB::raw("DATE_FORMAT(manifest_infos.date, '%d-%m-%Y') AS Delivery_Date"),
                 'manifest_lists.pcs AS Qty',
                 'manifest_lists.total_price AS Total_RM'
             );
+
 
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $start_date = $request->start_date . " 00:00:00";
             $end_date = $request->end_date . " 23:59:59";
 
-            $query->whereBetween('manifest_lists.created_at', [$start_date, $end_date]);
+            $query->whereBetween('manifest_infos.date', [$start_date, $end_date]);
         }
-
-        $query->orderBy($sortBy, $sortOrder);
 
         $manifests = $query->paginate($perPage);
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
@@ -37,7 +38,12 @@ class ClientController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:clients,name',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('clients')->whereNull('deleted_at')  // 👈 重点
+            ],
             'shipping_plan_id' => 'required|exists:shipping_plans,id',
         ]);
 
@@ -48,7 +54,6 @@ class ClientController extends Controller
 
         return response()->json($client, 201);
     }
-
 
     public function show($id)
     {
@@ -79,7 +84,12 @@ class ClientController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('clients')->ignore($client->id)->whereNull('deleted_at') // 👈 重点
+            ],
             'shipping_plan_id' => 'required|exists:shipping_plans,id',
         ]);
 
@@ -90,6 +100,7 @@ class ClientController extends Controller
 
         return response()->json($client, 200);
     }
+
 
 
     // 软删除 Client

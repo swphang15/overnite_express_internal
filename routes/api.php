@@ -15,13 +15,15 @@ use App\Http\Controllers\ShippingPlanController;
 use App\Http\Controllers\ShippingRateController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\DBBackupController;
+use App\Http\Controllers\AccessController;
 
-Route::middleware('auth:sanctum')->post('/db-backup', [DBBackupController::class, 'download']);
+Route::middleware('auth:sanctum')->post('/db-backup', [DBBackupController::class, 'downloadBackupWithPDO']);
 
 
 Route::get('dashboard/count', [StatsController::class, 'getCounts']);
-Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
+
 Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
+
 
 
 
@@ -65,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/manifest/{id}', [ManifestController::class, 'show']);
     Route::get('/manifest/{id}/{listId}', [ManifestController::class, 'showOneList']);
     Route::put('/manifest-list/{id}', [ManifestController::class, 'updateManifestList']);
+    Route::post('/check-route', [ManifestController::class, 'checkRouteValidity']);
 
 
 
@@ -79,8 +82,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/consignor/{id}/cn_numbers', [ManifestInfoController::class, 'getCnNumbers']);
 
 
-
+    Route::post('/manifest/invoice', [ManifestInfoController::class, 'searchManifest']);
     Route::post('/manifest/excel', [ManifestController::class, 'exportManifest']);
+
+    Route::post('/verify-admin-password', [AccessController::class, 'verifyAdminPassword']);
 });
 
 
@@ -97,6 +102,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/shipping-rates/{id}', [ShippingRateController::class, 'destroy']);
     Route::get('/shipping-rates/trashed', [ShippingRateController::class, 'trashed']);
     Route::post('/shipping-rates/restore/{id}', [ShippingRateController::class, 'restore']);
+
+    Route::post('/shipping-plans/duplicate/{id}', [ShippingController::class, 'duplicateShippingPlan']);
 });
 
 

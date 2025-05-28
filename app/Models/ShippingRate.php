@@ -11,13 +11,15 @@ class ShippingRate extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'shipping_rates'; // 指定表名
+
     protected $fillable = [
-        'shipping_plan_id', 
-        'origin', 
+        'shipping_plan_id',
+        'origin',
         'destination',
-        'minimum_price', 
+        'minimum_price',
         'minimum_weight',
-        'additional_price_per_kg'
+        'additional_price_per_kg',
+        'misc_charge',
     ];
 
     // 关联 ShippingPlan

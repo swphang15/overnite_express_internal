@@ -6,6 +6,8 @@ use App\Models\ShippingRate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use App\Models\Client;
 
 class ShippingRateController extends Controller
 {
@@ -29,8 +31,9 @@ class ShippingRateController extends Controller
             'origin' => 'required|string|max:3',
             'destination' => 'required|string|max:3',
             'minimum_price' => 'required|numeric|min:0',
-            'minimum_weight' => 'required|integer|min:0',
+            'minimum_weight' => 'required|numeric|min:0',
             'additional_price_per_kg' => 'required|numeric|min:0',
+            'misc_charge' => 'required|numeric|min:0',
         ]);
 
         // 检查是否已有相同 origin 和 destination 的记录
@@ -76,8 +79,9 @@ class ShippingRateController extends Controller
             'origin' => 'sometimes|string|max:3',
             'destination' => 'sometimes|string|max:3',
             'minimum_price' => 'sometimes|numeric|min:0',
-            'minimum_weight' => 'sometimes|integer|min:0',
+            'minimum_weight' => 'sometimes|numeric|min:0',
             'additional_price_per_kg' => 'sometimes|numeric|min:0',
+            'misc_charge' => 'sometimes|numeric|min:0', // ✅ 新增字段验证
         ]);
 
         // 获取当前 shipping plan id
@@ -106,7 +110,43 @@ class ShippingRateController extends Controller
     }
 
 
+    public function OAD(Request $request)
+    {
+        $request->validate([
+            'client_id' => 'required|integer',
+        ]);
 
+        // ✅ 根据 client_id 获取 client，并加载它关联的 shippingPlan
+        $client = Client::with('shippingPlan.shippingRates')->find($request->client_id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Client not found'], 404);
+        }
+
+        // ✅ 获取与该 client 关联的所有 shippingRates
+        $rates = $client->shippingPlan->shippingRates;
+
+        // ✅ 提取唯一的 origin
+        $origins = collect($rates)->pluck('origin')->unique()->map(function ($origin) {
+            return [
+                'id' => (string) $origin,
+                'name' => $origin
+            ];
+        })->values()->toArray();
+
+        // ✅ 提取唯一的 destination
+        $destinations = collect($rates)->pluck('destination')->unique()->map(function ($destination) {
+            return [
+                'id' => (string) $destination,
+                'name' => $destination
+            ];
+        })->values()->toArray();
+
+        return response()->json([
+            'origin' => $origins,
+            'destinations' => $destinations
+        ]);
+    }
 
     // 软删除 Shipping Rate
     public function destroy($id)
@@ -139,30 +179,5 @@ class ShippingRateController extends Controller
     }
 
     // 获取唯一的 origin 和 destination 组合
-    public function OAD()
-    {
-        $rates = ShippingRate::select('origin', 'destination')->get();
-        Log::info($rates);
 
-        // Get unique origins
-        $origins = $rates->pluck('origin')->unique()->map(function ($origin) {
-            return [
-                'id' => (string) $origin,
-                'name' => $origin
-            ];
-        })->values()->toArray();
-
-        // Get unique destinations
-        $destinations = $rates->pluck('destination')->unique()->map(function ($destination) {
-            return [
-                'id' => (string) $destination,
-                'name' => $destination
-            ];
-        })->values()->toArray();
-
-        return response()->json([
-            'origin' => $origins,
-            'destinations' => $destinations
-        ], 200);
-    }
 }

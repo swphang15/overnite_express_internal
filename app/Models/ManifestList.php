@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes; 
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class ManifestList extends Model
 {
     use HasFactory, SoftDeletes;
@@ -24,11 +25,12 @@ class ManifestList extends Model
         'discount',
         'origin',
         'destination',
+        'misc_charge',
     ];
 
     public function manifestInfo()
     {
-     
+
         return $this->belongsTo(ManifestInfo::class, 'manifest_info_id');
     }
 
@@ -36,9 +38,8 @@ class ManifestList extends Model
     {
         return $this->belongsTo(Client::class, 'consignor_id');
     }
-  public function client()
-{
-    return $this->belongsTo(Client::class, 'consignor_id');
-}
-
+    public function client()
+    {
+        return $this->belongsTo(Client::class, 'consignor_id');
+    }
 }

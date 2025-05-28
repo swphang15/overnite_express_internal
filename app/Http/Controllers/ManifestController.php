@@ -16,9 +16,62 @@ use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
+    public function checkRouteValidity(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'consignor_id' => 'required|exists:clients,id',
+                'origin' => 'required|string',
+                'destination' => 'required|string'
+            ]);
+
+            // 获取 consignor 的 shipping plan id
+            $consignor = Client::findOrFail($validatedData['consignor_id']);
+            $shippingPlanId = $consignor->shipping_plan_id;
+
+            if (!$shippingPlanId) {
+                return response()->json([
+                    'message' => 'Consignor does not have a shipping plan assigned.'
+                ], 400);
+            }
+
+            // 检查是否存在对应的 route
+            $routeExists = ShippingRate::where('shipping_plan_id', $shippingPlanId)
+                ->where('origin', $validatedData['origin'])
+                ->where('destination', $validatedData['destination'])
+                ->exists();
+
+            if ($routeExists) {
+                return response()->json([
+                    'message' => 'Route is valid.'
+                ], 200);
+            } else {
+                return response()->json([
+                    'message' => 'Route not found. Please check if your origin and destination are correct.'
+                ], 400);
+            }
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Consignor not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'An unexpected error occurred. Please try again later.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 
     public function downloadPdf($manifestId)
@@ -28,27 +81,47 @@ class ManifestController extends Controller
     }
 
     // 📌 【2️⃣ 导出 Excel 】
-
     public function exportManifest(Request $request)
     {
-        // 验证请求参数
         $request->validate([
             'consignor_id' => 'required|integer',
             'start_date'   => 'required|date',
             'end_date'     => 'required|date'
         ]);
 
-        // 获取参数
         $consignorId = $request->consignor_id;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
 
-        // 生成文件名，例如：Manifest_123_20240328.xlsx
-        $filename = "Manifest_invoice{$consignorId}_" . now()->format('Ymd') . ".xlsx";
+        // 获取 Client 名称（保留原样）
+        $client = Client::findOrFail($consignorId);
+        $clientName = $client->name;
 
-        // 生成 Excel 并返回下载
-        return Excel::download(new ManifestExcelExport($consignorId, $startDate, $endDate), $filename);
+        // 清理文件名非法字符
+        $cleanName = preg_replace('/[\\\\\/:*?"<>|]/', '', $clientName);
+
+        // 格式化日期为：月缩写 + 年后两位（如：MAR25）
+        $date = Carbon::parse($startDate);
+        $monthAbbr = strtoupper($date->format('M'));  // 月缩写，如 MAR
+        $yearTwoDigit = $date->format('y');           // 年后两位，如 25
+
+        $formattedDate = "{$monthAbbr}{$yearTwoDigit}"; // 拼接成：MAR25
+
+        // 文件名：Company B_MAR25_invoice.xlsx
+        $filename = "{$cleanName}_{$formattedDate}.xlsx";
+
+        // 生成 Excel 内容
+        $excelExport = new ManifestExcelExport($consignorId, $startDate, $endDate);
+        $excelContent = Excel::raw($excelExport, \Maatwebsite\Excel\Excel::XLSX);
+
+        return response($excelContent, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Expose-Headers' => 'Content-Disposition',
+        ]);
     }
+
     public function store(Request $request)
     {
         try {
@@ -343,6 +416,29 @@ class ManifestController extends Controller
             ], 500);
         }
     }
+    private function getMiscCharge($consignorId, $origin, $destination)
+    {
+        $client = \App\Models\Client::find($consignorId);
+        if (!$client || !$client->shipping_plan_id) {
+            Log::info('Client or shipping_plan_id not found for consignorId: ' . $consignorId);
+            return 0.00;
+        }
+
+        $shippingRate = DB::table('shipping_rates')
+            ->where('shipping_plan_id', $client->shipping_plan_id)
+            ->where('origin', $origin)
+            ->where('destination', $destination)
+            ->first();
+
+        if (!$shippingRate) {
+            Log::info('Shipping rate not found for shipping_plan_id: ' . $client->shipping_plan_id . ', origin: ' . $origin . ', destination: ' . $destination);
+            return 0.00;
+        }
+
+        Log::info('Misc charge found: ' . $shippingRate->misc_charge);
+        return $shippingRate->misc_charge;
+    }
+
     public function updateManifestList(Request $request, $id)
     {
         try {
@@ -359,7 +455,29 @@ class ManifestController extends Controller
 
             $manifestList = ManifestList::findOrFail($id);
 
-            // 检查 cn_no 是否唯一（排除自己）
+            // 检查 consignor 是否存在 shipping_plan_id
+            $consignor = Client::findOrFail($validatedData['consignor_id']);
+            $shippingPlanId = $consignor->shipping_plan_id;
+
+            if (!$shippingPlanId) {
+                return response()->json([
+                    'message' => 'Consignor does not have a shipping plan assigned.'
+                ], 400);
+            }
+
+            // 检查是否存在对应的 shipping rate
+            $routeExists = ShippingRate::where('shipping_plan_id', $shippingPlanId)
+                ->where('origin', $validatedData['origin'])
+                ->where('destination', $validatedData['destination'])
+                ->exists();
+
+            if (!$routeExists) {
+                return response()->json([
+                    'message' => 'Route not found. Please check if your origin and destination are correct.'
+
+                ], 400);
+            }
+
             $duplicate = ManifestList::where('cn_no', $validatedData['cn_no'])
                 ->where('id', '!=', $id)
                 ->exists();
@@ -367,13 +485,22 @@ class ManifestController extends Controller
             if ($duplicate) {
                 $warning = "CN No: {$validatedData['cn_no']} already exists, total_price set to 0";
                 $totalPrice = 0;
+                $miscCharge = 0;
             } else {
-                $totalPrice = $this->calculateTotalPrice(
+                $totalDetails = $this->calculateTotalPriceDetailed(
                     $validatedData['origin'],
                     $validatedData['destination'],
                     $validatedData['consignor_id'],
                     $validatedData['kg']
                 );
+                $totalPrice = $totalDetails['total'];
+
+                $miscCharge = $this->getMiscCharge(
+                    $validatedData['consignor_id'],
+                    $validatedData['origin'],
+                    $validatedData['destination']
+                );
+
                 $warning = null;
             }
 
@@ -388,7 +515,10 @@ class ManifestController extends Controller
                 'origin' => $validatedData['origin'],
                 'destination' => $validatedData['destination'],
                 'remarks' => $validatedData['remarks'] ?? null,
+                'misc_charge' => number_format($miscCharge, 2, '.', ''),
             ]);
+
+            $manifestList->refresh();
 
             return response()->json([
                 'message' => 'Manifest list updated successfully',
@@ -406,10 +536,52 @@ class ManifestController extends Controller
             ], 404);
         } catch (Exception $e) {
             return response()->json([
-                'message' => 'Something went wrong',
+                'message' => 'An unexpected error occurred. Please try again later.',
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+
+
+    private function calculateTotalPriceDetailed($from, $to, $consignorId, $kg)
+    {
+        $client = Client::find($consignorId);
+        if (!$client) {
+            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+        }
+
+        $from = strtoupper($from);
+        $to = strtoupper($to);
+
+        $shippingRate = ShippingRate::where('origin', $from)
+            ->where('destination', $to)
+            ->where('shipping_plan_id', $client->shipping_plan_id)
+            ->first();
+
+        if (!$shippingRate) {
+            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+        }
+
+        // 🚚 关键修改点：超重部分向上取整计算
+        if ($kg <= $shippingRate->minimum_weight) {
+            $basePrice = $shippingRate->minimum_price;
+        } else {
+            $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
+            $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+            $basePrice = $shippingRate->minimum_price + $extraCost;
+        }
+
+        $miscCharge = $shippingRate->misc_charge ?? 0;
+        $total = $basePrice + $miscCharge;
+
+        return [
+            'base_price' => (float) $basePrice,
+            'misc_charge' => (float) $miscCharge,
+            'total' => (float) $total,
+        ];
     }
 
 

@@ -7,9 +7,61 @@ use App\Models\Manifest;
 use App\Models\ShippingPlan;
 use App\Models\ShippingRate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use App\Models\Client;
+
 
 class ShippingController extends Controller
 {
+    public function duplicateShippingPlan($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Step 1: 找到原本的 shipping plan
+            $originalPlan = ShippingPlan::findOrFail($id);
+
+            // Step 2: 生成不重复的 plan 名称
+            $baseName = $originalPlan->plan_name . '-Duplicate';
+            $newName = $baseName;
+
+            $counter = 0;
+            while (ShippingPlan::where('plan_name', $newName)->exists()) {
+                $counter++;
+                $newName = $baseName . "($counter)";
+            }
+
+            // Step 3: 创建新的 shipping plan
+            $newPlan = $originalPlan->replicate();
+            $newPlan->plan_name = $newName;
+            $newPlan->push();
+
+            // Step 4: 复制 shipping rates
+            $originalRates = ShippingRate::where('shipping_plan_id', $originalPlan->id)->get();
+
+            foreach ($originalRates as $rate) {
+                $newRate = $rate->replicate();
+                $newRate->shipping_plan_id = $newPlan->id;
+                $newRate->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Shipping Plan duplicated successfully.',
+                'new_plan_id' => $newPlan->id,
+                'new_plan_name' => $newPlan->plan_name,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'message' => 'Failed to duplicate shipping plan.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function __construct()
     {
         $this->middleware('auth:sanctum'); // 所有方法都需要 Token
@@ -52,16 +104,25 @@ class ShippingController extends Controller
     public function store(Request $request)
     {
         // 验证请求数据
+
+
         $request->validate([
-            'shipping_plan_id' => 'nullable|exists:shipping_plans,id', // 允许传 plan_id，但必须存在
-            'plan_name' => 'required_without:shipping_plan_id|string|max:255|unique:shipping_plans,plan_name',
+            'shipping_plan_id' => 'nullable|exists:shipping_plans,id',
+            'plan_name' => [
+                'required_without:shipping_plan_id',
+                'string',
+                'max:255',
+                Rule::unique('shipping_plans', 'plan_name')->whereNull('deleted_at'),
+            ],
             'shipping_rates' => 'required|array|min:1',
             'shipping_rates.*.origin' => 'required|string|max:3',
             'shipping_rates.*.destination' => 'required|string|max:3',
             'shipping_rates.*.minimum_price' => 'required|numeric|min:0',
-            'shipping_rates.*.minimum_weight' => 'required|integer|min:0',
+            'shipping_rates.*.minimum_weight' => 'required|numeric|min:0',
             'shipping_rates.*.additional_price_per_kg' => 'required|numeric|min:0',
+            'shipping_rates.*.misc_charge' => 'required|numeric|min:0',
         ]);
+
 
         DB::beginTransaction(); // 开启事务
 
@@ -92,12 +153,13 @@ class ShippingController extends Controller
 
                 // **创建 ShippingRate**
                 $rates[] = ShippingRate::create([
-                    'shipping_plan_id' => $plan->id, // 绑定 shipping_plan
+                    'shipping_plan_id' => $plan->id,
                     'origin' => $rateData['origin'],
                     'destination' => $rateData['destination'],
                     'minimum_price' => $rateData['minimum_price'],
                     'minimum_weight' => $rateData['minimum_weight'],
                     'additional_price_per_kg' => $rateData['additional_price_per_kg'],
+                    'misc_charge' => $rateData['misc_charge'] ?? 0, // ✅ 加进去，默认值 0
                 ]);
             }
 
@@ -117,16 +179,24 @@ class ShippingController extends Controller
         }
     }
 
+
     public function update(Request $request, $id)
     {
         $request->validate([
-            'plan_name' => 'required|string|max:255|unique:shipping_plans,plan_name,' . $id,
+            'plan_name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('shipping_plans', 'plan_name')
+                    ->ignore($id) // 忽略当前 plan 的 ID
+                    ->whereNull('deleted_at'), // 只检查未软删除的
+            ],
             'shipping_rates' => 'nullable|array',
             'shipping_rates.*.id' => 'nullable|exists:shipping_rates,id',
             'shipping_rates.*.origin' => 'required|string|max:3',
             'shipping_rates.*.destination' => 'required|string|max:3',
             'shipping_rates.*.minimum_price' => 'required|numeric|min:0',
-            'shipping_rates.*.minimum_weight' => 'required|integer|min:0',
+            'shipping_rates.*.minimum_weight' => 'required|numeric|min:0',
             'shipping_rates.*.additional_price_per_kg' => 'required|numeric|min:0',
         ]);
 
@@ -168,13 +238,19 @@ class ShippingController extends Controller
     {
         DB::beginTransaction();
         try {
-            // **查找 Shipping Plan**
+            // 查找 Shipping Plan
             $plan = ShippingPlan::findOrFail($id);
 
-            // **删除所有关联的 Shipping Rates**
-            $plan->shippingRates()->delete();
+            // 检查有没有 Client 使用这个 Plan
+            $clientsUsingPlan = Client::where('shipping_plan_id', $id)->exists(); // 👈 重点
 
-            // **删除 Shipping Plan**
+            if ($clientsUsingPlan) {
+                // 有 client 用着，不能删除
+                return response()->json(['message' => 'Cannot delete: Shipping plan is being used by a client'], 400);
+            }
+
+            // 没有被使用，可以安全删除
+            $plan->shippingRates()->delete();
             $plan->delete();
 
             DB::commit();
@@ -184,6 +260,7 @@ class ShippingController extends Controller
             return response()->json(['message' => 'Failed to delete shipping plan', 'error' => $e->getMessage()], 500);
         }
     }
+
 
     public function deleteShippingRate($id)
     {

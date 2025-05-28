@@ -16,9 +16,9 @@ return new class extends Migration {
             $table->string('origin');
             $table->string('destination');
             $table->decimal('minimum_price', 8, 2);
-            $table->integer('minimum_weight');
+            $table->decimal('maximum_weight', 8, 2);
             $table->decimal('additional_price_per_kg', 8, 2);
-
+            $table->decimal('misc_charge', 10, 2)->default(0);
             $table->timestamps(); // created_at 和 updated_at
             $table->softDeletes(); // 软删除字段 deleted_at
         });
