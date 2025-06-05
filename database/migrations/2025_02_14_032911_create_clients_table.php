@@ -12,6 +12,7 @@ return new class extends Migration {
             $table->unsignedBigInteger('shipping_plan_id'); // 必须是 UNSIGNED，确保与 shipping_plans.id 类型匹配
             $table->foreign('shipping_plan_id')->references('id')->on('shipping_plans')->onDelete('cascade');
             $table->string('name'); // 客户名称
+            $table->string("code")->nullable();
             $table->timestamps(); // created_at 和 updated_at
             $table->softDeletes(); // 软删除字段 deleted_at
         });

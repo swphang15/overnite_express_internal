@@ -24,6 +24,7 @@ class ClientController extends Controller
             return [
                 'id' => $client->id,
                 'name' => $client->name,
+                'code' => $client->code, // 确保 code 字段也被返回
                 'shipping_plan_id' => $client->shipping_plan_id,
                 'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保返回
                 'created_at' => $client->created_at,
@@ -43,6 +44,12 @@ class ClientController extends Controller
                 'string',
                 'max:255',
                 Rule::unique('clients')->whereNull('deleted_at')  // 👈 重点
+            ],
+            'code' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('clients')->whereNull('deleted_at') // 确保 code 字段唯一
             ],
             'shipping_plan_id' => 'required|exists:shipping_plans,id',
         ]);
@@ -66,6 +73,7 @@ class ClientController extends Controller
         return response()->json([
             'id' => $client->id,
             'name' => $client->name,
+            'code' => $client->code, // 确保 code 字段也被返回
             'shipping_plan_id' => $client->shipping_plan_id,
             'plan_name' => $client->shippingPlan ? $client->shippingPlan->plan_name : null, // 确保 plan_name 正确返回
             'created_at' => $client->created_at,
@@ -90,11 +98,18 @@ class ClientController extends Controller
                 'max:255',
                 Rule::unique('clients')->ignore($client->id)->whereNull('deleted_at') // 👈 重点
             ],
+            'code' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('clients')->ignore($client->id)->whereNull('deleted_at') // 确保 code 字段唯一
+            ],
             'shipping_plan_id' => 'required|exists:shipping_plans,id',
         ]);
 
         $client->update([
             'name' => $request->name,
+            'code' => $request->code, // 确保 code 字段也被更新
             'shipping_plan_id' => $request->shipping_plan_id,
         ]);
 

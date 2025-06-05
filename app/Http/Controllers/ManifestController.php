@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AutocountARInvoiceExport;
 use Illuminate\Http\Request;
 use App\Models\Client;
 use App\Models\ShippingRate;
@@ -111,7 +112,11 @@ class ManifestController extends Controller
         $filename = "{$cleanName}_{$formattedDate}.xlsx";
 
         // 生成 Excel 内容
-        $excelExport = new ManifestExcelExport($consignorId, $startDate, $endDate);
+        if ($request->autocount) {
+            $excelExport = new AutocountARInvoiceExport($consignorId, $startDate, $endDate);
+        } else {
+            $excelExport = new ManifestExcelExport($consignorId, $startDate, $endDate);
+        }
         $excelContent = Excel::raw($excelExport, \Maatwebsite\Excel\Excel::XLSX);
 
         return response($excelContent, 200, [
