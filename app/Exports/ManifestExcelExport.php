@@ -54,8 +54,8 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         $this->incrementExportCount();
         return $exportNo;
     }
-
     public function collection()
+
     {
         $data = [];
         $totalPrice = 0;
@@ -63,31 +63,34 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         $consignor = Client::find($this->consignorId);
         $consignorName = $consignor ? $consignor->name : "UNKNOWN";
 
-        // 获取 manifest_lists 数据，并排除软删除的记录
-        $manifestData = DB::table('manifest_lists')
-            ->where('consignor_id', $this->consignorId)
-            ->whereBetween('created_at', [
+        //  USE manifest_infos.date filter manifest_info ID
+        $manifestInfoIds = DB::table('manifest_infos')
+            ->whereBetween('date', [
                 Carbon::parse($this->startDate)->startOfDay(),
                 Carbon::parse($this->endDate)->endOfDay()
             ])
-            ->whereNull('deleted_at') // 加上这一行
+            ->whereNull('deleted_at')
+            ->pluck('id');
+
+        // use manifest_info_id find manifest_lists data
+        $manifestData = DB::table('manifest_lists')
+            ->where('consignor_id', $this->consignorId)
+            ->whereIn('manifest_info_id', $manifestInfoIds)
+            ->whereNull('deleted_at')
             ->get();
 
-        // 获取所有相关的 manifest_info_id
-        $manifestInfoIds = $manifestData->pluck('manifest_info_id')->unique()->filter();
-
-        // 提前查询 manifest_infos 并用 id 做 key（id => date），也排除软删除的记录
+        // check manifest_infos data information（produce delivery date）
         $manifestInfos = DB::table('manifest_infos')
             ->whereIn('id', $manifestInfoIds)
-            ->whereNull('deleted_at') // 加上这一行
+            ->whereNull('deleted_at')
             ->pluck('date', 'id');
 
-        // 排序 manifestData based on delivery date
+        // follow delivery date arrangment
         $manifestData = $manifestData->sortByDesc(function ($row) use ($manifestInfos) {
             return isset($manifestInfos[$row->manifest_info_id])
                 ? Carbon::parse($manifestInfos[$row->manifest_info_id])
-                : Carbon::createFromTimestamp(0); // 如果找不到就给个最早的时间
-        })->values(); // 重新索引
+                : Carbon::createFromTimestamp(0);
+        })->values();
 
         $exportNo = $this->generateExportNo();
         $exportDate = Carbon::now()->format('d-m-Y');
@@ -128,8 +131,84 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         $data[] = ["", "", "", "", "", "", "", ""];
         $data[] = ["", "", "", "", "", "", "TOTAL PRICE:", number_format((float) $totalPrice, 2, '.', '')];
 
-        return new Collection($data);
+        return new \Illuminate\Support\Collection($data);
     }
+
+    // public function collection()
+    // {
+    //     $data = [];
+    //     $totalPrice = 0;
+
+    //     $consignor = Client::find($this->consignorId);
+    //     $consignorName = $consignor ? $consignor->name : "UNKNOWN";
+
+    //     // 获取 manifest_lists 数据，并排除软删除的记录
+    //     $manifestData = DB::table('manifest_lists')
+    //         ->where('consignor_id', $this->consignorId)
+    //         ->whereBetween('created_at', [
+    //             Carbon::parse($this->startDate)->startOfDay(),
+    //             Carbon::parse($this->endDate)->endOfDay()
+    //         ])
+    //         ->whereNull('deleted_at') // 加上这一行
+    //         ->get();
+
+    //     // 获取所有相关的 manifest_info_id
+    //     $manifestInfoIds = $manifestData->pluck('manifest_info_id')->unique()->filter();
+
+    //     // 提前查询 manifest_infos 并用 id 做 key（id => date），也排除软删除的记录
+    //     $manifestInfos = DB::table('manifest_infos')
+    //         ->whereIn('id', $manifestInfoIds)
+    //         ->whereNull('deleted_at') // 加上这一行
+    //         ->pluck('date', 'id');
+
+    //     // 排序 manifestData based on delivery date
+    //     $manifestData = $manifestData->sortByDesc(function ($row) use ($manifestInfos) {
+    //         return isset($manifestInfos[$row->manifest_info_id])
+    //             ? Carbon::parse($manifestInfos[$row->manifest_info_id])
+    //             : Carbon::createFromTimestamp(0); // 如果找不到就给个最早的时间
+    //     })->values(); // 重新索引
+
+    //     $exportNo = $this->generateExportNo();
+    //     $exportDate = Carbon::now()->format('d-m-Y');
+
+    //     $data[] = ["", "", "", "", "", "", "No.", ": $exportNo"];
+    //     $data[] = [$consignorName, "", "", "", "", "", "Your Ref.", ":"];
+    //     $data[] = ["", "", "", "", "", "", "Our D/O No.", ":"];
+    //     $data[] = ["CLIENT / DESTINATION", "", "", "", "", "", "Terms", ": C.O.D"];
+    //     $data[] = ["", "", "", "", "", "", "Date", ": $exportDate"];
+    //     $data[] = ["TEL : ____________", "", "FAX : ____________", "", "", "", "Page", ":"];
+    //     $data[] = [""];
+
+    //     $data[] = ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "Weight", "UOM", "Total RM"];
+
+    //     $counter = 1;
+    //     foreach ($manifestData as $row) {
+    //         $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
+    //         $totalPrice += $rowTotal;
+
+    //         $weight = floatval($row->kg) + (floatval($row->gram) / 1000);
+
+    //         $deliveryDate = isset($manifestInfos[$row->manifest_info_id])
+    //             ? Carbon::parse($manifestInfos[$row->manifest_info_id])->format('d-m-Y')
+    //             : '';
+
+    //         $data[] = [
+    //             $counter++,
+    //             $row->origin . " - " . $row->destination,
+    //             $row->cn_no,
+    //             $deliveryDate,
+    //             intval($row->pcs),
+    //             number_format((float) $weight, 2, '.', ''),
+    //             "KG",
+    //             number_format((float) $rowTotal, 2, '.', '')
+    //         ];
+    //     }
+
+    //     $data[] = ["", "", "", "", "", "", "", ""];
+    //     $data[] = ["", "", "", "", "", "", "TOTAL PRICE:", number_format((float) $totalPrice, 2, '.', '')];
+
+    //     return new Collection($data);
+    // }
 
 
 

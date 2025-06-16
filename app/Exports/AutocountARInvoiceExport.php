@@ -59,46 +59,115 @@ class AutocountARInvoiceExport implements FromCollection, WithHeadings, WithColu
         ];
     }
 
+    // public function collection()
+    // {
+    //     $data = [];
+    //     // $totalPrice = 0;
+
+    //     $consignor = Client::find($this->consignorId);
+    //     $consignorCode = $consignor ? $consignor->code : "";
+
+    //     // 获取 manifest_lists 数据，并排除软删除的记录
+    //     $manifestData = DB::table('manifest_lists')
+    //         ->where('consignor_id', $this->consignorId)
+    //         ->whereBetween('created_at', [
+    //             Carbon::parse($this->startDate)->startOfDay(),
+    //             Carbon::parse($this->endDate)->endOfDay()
+    //         ])
+    //         ->whereNull('deleted_at') // 加上这一行
+    //         ->get();
+
+    //     // 获取所有相关的 manifest_info_id
+    //     $manifestInfoIds = $manifestData->pluck('manifest_info_id')->unique()->filter();
+
+    //     // 提前查询 manifest_infos 并用 id 做 key（id => date），也排除软删除的记录
+    //     $manifestInfos = DB::table('manifest_infos')
+    //         ->whereIn('id', $manifestInfoIds)
+    //         ->whereNull('deleted_at') // 加上这一行
+    //         ->pluck('date', 'id');
+
+    //     // 排序 manifestData based on delivery date
+    //     $manifestData = $manifestData->sortByDesc(function ($row) use ($manifestInfos) {
+    //         return isset($manifestInfos[$row->manifest_info_id])
+    //             ? Carbon::parse($manifestInfos[$row->manifest_info_id])
+    //             : Carbon::createFromTimestamp(0); // 如果找不到就给个最早的时间
+    //     })->values(); // 重新索引
+
+    //     $exportNo = $this->generateExportNo();
+    //     $exportDate = Carbon::now()->format('d/m/Y');
+
+    //     foreach ($manifestData as $row) {
+    //         $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
+    //         // $totalPrice += $rowTotal;
+
+    //         $data[] = [
+    //             $exportNo,
+    //             $exportDate,
+    //             $consignorCode,
+    //             'SALES',
+    //             'C.O.D.',
+    //             '',
+    //             'SALES',
+    //             'MYR',
+    //             1.00,
+    //             '',
+    //             '',
+    //             'F',
+    //             '5001-0000',
+    //             1.00,
+    //             $row->cn_no,
+    //             '',
+    //             '',
+    //             '',
+    //             0,
+    //             0,
+    //             number_format((float) $rowTotal, 2, '.', '')
+    //         ];
+    //     }
+    //     return new Collection($data);
+    // }
+
     public function collection()
     {
         $data = [];
-        // $totalPrice = 0;
 
         $consignor = Client::find($this->consignorId);
         $consignorCode = $consignor ? $consignor->code : "";
 
-        // 获取 manifest_lists 数据，并排除软删除的记录
-        $manifestData = DB::table('manifest_lists')
-            ->where('consignor_id', $this->consignorId)
-            ->whereBetween('created_at', [
+        // Get manifest_info_ids based on the date range, excluding soft-deleted records
+        $manifestInfoIds = DB::table('manifest_infos')
+            ->whereBetween('date', [
                 Carbon::parse($this->startDate)->startOfDay(),
                 Carbon::parse($this->endDate)->endOfDay()
             ])
-            ->whereNull('deleted_at') // 加上这一行
+            ->whereNull('deleted_at')
+            ->pluck('id');
+
+        // Get manifest_lists data, excluding soft-deleted records
+        $manifestData = DB::table('manifest_lists')
+            ->where('consignor_id', $this->consignorId)
+            ->whereIn('manifest_info_id', $manifestInfoIds)
+            ->whereNull('deleted_at')
             ->get();
 
-        // 获取所有相关的 manifest_info_id
-        $manifestInfoIds = $manifestData->pluck('manifest_info_id')->unique()->filter();
-
-        // 提前查询 manifest_infos 并用 id 做 key（id => date），也排除软删除的记录
+        // Get all related manifest_info_id
         $manifestInfos = DB::table('manifest_infos')
             ->whereIn('id', $manifestInfoIds)
-            ->whereNull('deleted_at') // 加上这一行
+            ->whereNull('deleted_at')
             ->pluck('date', 'id');
 
-        // 排序 manifestData based on delivery date
+        // arrange manifestData based on delivery date
         $manifestData = $manifestData->sortByDesc(function ($row) use ($manifestInfos) {
             return isset($manifestInfos[$row->manifest_info_id])
                 ? Carbon::parse($manifestInfos[$row->manifest_info_id])
-                : Carbon::createFromTimestamp(0); // 如果找不到就给个最早的时间
-        })->values(); // 重新索引
+                : Carbon::createFromTimestamp(0);
+        })->values();
 
         $exportNo = $this->generateExportNo();
         $exportDate = Carbon::now()->format('d/m/Y');
 
         foreach ($manifestData as $row) {
             $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
-            // $totalPrice += $rowTotal;
 
             $data[] = [
                 $exportNo,
@@ -124,8 +193,10 @@ class AutocountARInvoiceExport implements FromCollection, WithHeadings, WithColu
                 number_format((float) $rowTotal, 2, '.', '')
             ];
         }
+
         return new Collection($data);
     }
+
 
     public function headings(): array
     {
