@@ -49,12 +49,6 @@
             font-weight: bold;
         }
 
-        .left-align {
-            text-align: left;
-            padding-left: 5px;
-        }
-
-
         .header-text {
             font-size: 14px;
             font-weight: bold;
@@ -78,7 +72,7 @@
         $date = Carbon::parse($manifestInfo->date);
     @endphp
 
-    <!-- ✅ 顶部表格（公司信息 + 单号） -->
+    <!-- 顶部公司与航班信息 -->
     <table>
         <tr>
             <td style="width: 32%; text-align: left; vertical-align: middle;">
@@ -131,11 +125,10 @@
                 <span style="font-size: 15px; font-weight: bold;">Manifest No.</span><br>
                 <span style="font-size: 13px;">{{ $manifestInfo->manifest_no }}</span>
             </td>
-
         </tr>
     </table>
 
-    <!-- ✅ 主表格（数据部分） -->
+    <!-- 数据表格 -->
     <table>
         <thead>
             <tr class="header-text">
@@ -148,7 +141,7 @@
                 <th style="width: 8%;">PCS</th>
                 <th style="width: 8%;">KG</th>
                 <th style="width: 8%;">GM</th>
-                <th colspan="4" style="width: 18%;">Remarks</th>
+                <th style="width: 10%;">Remarks</th>
             </tr>
         </thead>
         <tbody>
@@ -163,28 +156,24 @@
                     <td>{{ $list->pcs }}</td>
                     <td>{{ $list->kg }}</td>
                     <td>{{ $list->gram }}</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td>{{ $list->remarks }}</td>
                 </tr>
             @endforeach
 
-            <!-- ✅ 总结行 -->
+            <!-- 总结行 -->
             <tr class="summary-text">
-                <td></td>
-                <td colspan="3" style="text-align: center;">Manifest Weight:</td>
-                <td colspan="1" style="text-align: center;">
+                <td></td> {{-- No --}}
+                <td colspan="3" style="text-align: center;">Manifest Weight:</td> {{-- Origin + Destination + Consignor --}}
+                <td style="text-align: center;">
                     {{ number_format($manifestLists->sum('kg') + $manifestLists->sum('gram') / 1000, 2) }} KG
-                </td>
-                <td colspan="1" style="text-align: center;">Total PCS:</td>
-                <td colspan="1" style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td>
-                <td colspan="2" style="text-align: center;">AWB WEIGHT:</td>
-                <td colspan="1"></td>
-                <td colspan="1"></td>
-                <td colspan="1"></td>
-                <td colspan="1"></td>
+                </td> {{-- Consignee --}}
+                <td style="text-align: center;">Total PCS:</td> {{-- CN No --}}
+                <td style="text-align: center;">{{ $manifestLists->sum('pcs') }}</td> {{-- PCS --}}
+                <td colspan="2" style="text-align: left;">AWB WEIGHT:</td> {{-- KG + GM 合并 --}}
+                <td></td> {{-- Remarks --}}
             </tr>
+
+
         </tbody>
     </table>
 
