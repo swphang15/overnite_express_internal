@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -16,10 +17,12 @@ return new class extends Migration {
             $table->integer('kg');
             $table->integer('gram');
             $table->text('remarks')->nullable();
+            $table->decimal('base_price', 10, 2);
             $table->decimal('total_price', 10, 2);
             $table->decimal('discount', 10, 2)->nullable();
             $table->string('origin');
             $table->string('destination');
+            $table->decimal('fuel_surcharge', 10, 2)->default(0);
             $table->timestamps();
             $table->softDeletes(); // 软删除字段 deleted_at
         });

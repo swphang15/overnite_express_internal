@@ -143,6 +143,14 @@ class ShippingRateController extends Controller
         })->values()->toArray();
 
         return response()->json([
+            'rates' => $rates->map(function ($rate) {
+                return [
+                    'id' => $rate->id,
+                    'origin' => $rate->origin,
+                    'destination' => $rate->destination,
+                    'misc_charge' => $rate->misc_charge,
+                ];
+            }),
             'origin' => $origins,
             'destinations' => $destinations
         ]);

@@ -28,6 +28,8 @@ class ManifestInfoController extends Controller
                 'consignor_id' => 'required|exists:clients,id',
                 'kg' => 'required|numeric|min:0',
                 'cn_no' => 'required|numeric',
+                'misc_charge' => 'required|numeric',
+                'fuel_surcharge' => 'required|numeric',
             ]);
 
             // 检查 CN No 是否已存在
@@ -64,6 +66,8 @@ class ManifestInfoController extends Controller
 
             // ====== 新版：修改 calculateTotalPrice 返回结构 ======
             $priceDetails = $this->calculateTotalPriceDetailed(
+                $validatedData['fuel_surcharge'],
+                $validatedData['misc_charge'],
                 $validatedData['origin'],
                 $validatedData['destination'],
                 $validatedData['consignor_id'],
@@ -131,6 +135,8 @@ class ManifestInfoController extends Controller
                 'manifest_lists.*.origin' => 'required|string',
                 'manifest_lists.*.destination' => 'required|string',
                 'manifest_lists.*.remarks' => 'nullable|string',
+                'manifest_lists.*.misc_charge' => 'nullable|numeric|min:0',
+                'manifest_lists.*.fuel_surcharge' => 'nullable|numeric|min:0',
                 'manifest_lists.*.total_price' => isset($request->manifest_info_id)
                     ? 'prohibited'
                     : 'required|numeric|min:0'
@@ -162,22 +168,26 @@ class ManifestInfoController extends Controller
                 if ($existingManifest) {
                     $warningMessages[] = "CN No: {$list['cn_no']} already exists, the total price will be set to 0";
                     $totalPrice = 0;
+                    $basePrice = 0;
                 } else {
                     if (isset($validatedData['manifest_info_id'])) {
                         $totalDetails = $this->calculateTotalPriceDetailed(
+                            $list['fuel_surcharge'],
+                            $list['misc_charge'],
                             $list['origin'],
                             $list['destination'],
                             $list['consignor_id'],
                             $list['kg']
                         );
                         $totalPrice = $totalDetails['total'];
+                        $basePrice = $totalDetails['base_price'];
                     } else {
                         $totalPrice = $list['total_price'];
                     }
                 }
 
                 // ✅ 正确抓取 misc_charge
-                $miscCharge = $this->getMiscCharge($list['consignor_id'], $list['origin'], $list['destination']);
+                // $miscCharge = $this->getMiscCharge($list['consignor_id'], $list['origin'], $list['destination']);
 
                 return [
                     'manifest_info_id' => $manifestInfo->id,
@@ -192,7 +202,9 @@ class ManifestInfoController extends Controller
                     'origin' => $list['origin'],
                     'destination' => $list['destination'],
                     'remarks' => $list['remarks'] ?? null,
-                    'misc_charge' => number_format($miscCharge, 2, '.', ''),
+                    'base_price' => number_format($basePrice, 2, '.', ''),
+                    'fuel_surcharge' => number_format($list['fuel_surcharge'], 2, '.', ''),
+                    'misc_charge' => number_format($list['misc_charge'], 2, '.', ''),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -278,7 +290,7 @@ class ManifestInfoController extends Controller
     }
 
 
-    private function calculateTotalPriceDetailed($from, $to, $consignorId, $kg)
+    private function calculateTotalPriceDetailed($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
     {
         $client = Client::find($consignorId);
         if (!$client) {
@@ -306,12 +318,12 @@ class ManifestInfoController extends Controller
             $basePrice = $shippingRate->minimum_price + $extraCost;
         }
 
-        $miscCharge = $shippingRate->misc_charge ?? 0;
-        $total = $basePrice + $miscCharge;
+        // $miscCharge = $shippingRate->misc_charge ?? 0;
+        $total = $basePrice * $fuel_surcharge + $misc_charge;
 
         return [
             'base_price' => (float) $basePrice,
-            'misc_charge' => (float) $miscCharge,
+            'misc_charge' => (float) $misc_charge,
             'total' => (float) $total,
         ];
     }

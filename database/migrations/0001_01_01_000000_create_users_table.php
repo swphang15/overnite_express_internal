@@ -13,23 +13,18 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->enum('role', ['superadmin', 'admin', 'user'])->default('user'); // 角色字段
+            // , ['superadmin', 'admin', 'user']
+            $table->string('role')->default('user'); // 角色字段
             $table->string('name'); // 添加用户的姓名
-            $table->string('email')->unique();
+            $table->string('email');
             $table->string('password');
             $table->timestamps();
             $table->softDeletes(); // 添加 softDeletes 字段
         });
-        
-
-      
     }
 
     /**
      * Reverse the migrations.
      */
-    public function down(): void
-    {
-     
-    }
+    public function down(): void {}
 };

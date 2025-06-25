@@ -149,6 +149,8 @@ class ManifestController extends Controller
                 'lists.*.discount' => 'sometimes|nullable|numeric|min:0',
                 'lists.*.origin' => 'required|string',
                 'lists.*.remarks' => 'nullable|string',
+                'lists.*.misc_charge' => 'nullable|numeric|min:0',
+                'lists.*.fuel_surcharge' => 'nullable|numeric|min:0',
             ]);
 
             // 2️⃣ 计算 `manifest_no`
@@ -176,12 +178,16 @@ class ManifestController extends Controller
                 $grams = ($list['kg'] - $fullKg) * 1000;
 
                 // 计算 total_price
-                $totalPrice = $this->calculateTotalPrice(
+                $totalDetails = $this->calculateTotalPrice(
+                    $list['fuel_surcharge'],
+                    $list['misc_charge'],
                     $manifestInfo->from,
                     $manifestInfo->to,
                     $list['consignor_id'],
                     $list['kg']
                 );
+                $basePrice = $totalDetails['base_price'];
+                $totalPrice = $totalDetails['total'];
 
                 $manifestLists[] = ManifestList::create([
                     'manifest_info_id' => $manifestInfo->id,
@@ -196,6 +202,9 @@ class ManifestController extends Controller
                     'discount' => $list['discount'] ?? null,
                     'origin' => $list['origin'],
                     'remarks' => $list['remarks'] ?? null,
+                    'base_price' => number_format($basePrice, 2, '.', ''),
+                    'misc_charge' => $list['misc_charge'] ?? null,
+                    'fuel_surcharge' => $list['fuel_surcharge'] ?? null,
                 ]);
             }
 
@@ -321,6 +330,8 @@ class ManifestController extends Controller
                     'discount' => $item->discount,
                     'origin' => $item->origin,
                     'destination' => $item->destination,
+                    'misc_charge' => $item->misc_charge,
+                    'fuel_surcharge' => $item->fuel_surcharge,
                     'created_at' => $item->created_at,
                     'updated_at' => $item->updated_at,
                     'deleted_at' => $item->deleted_at
@@ -372,6 +383,8 @@ class ManifestController extends Controller
                 'discount' => $list->discount,
                 'origin' => $list->origin,
                 'destination' => $list->destination,
+                'misc_charge' => $list->misc_charge,
+                'fuel_surcharge' => $list->fuel_surcharge,
                 'created_at' => $list->created_at,
                 'updated_at' => $list->updated_at,
                 'deleted_at' => $list->deleted_at
@@ -455,7 +468,9 @@ class ManifestController extends Controller
                 'kg' => 'required|numeric|min:0',
                 'origin' => 'required|string',
                 'destination' => 'required|string',
-                'remarks' => 'nullable|string'
+                'remarks' => 'nullable|string',
+                'misc_charge' => 'required|numeric|min:0',
+                'fuel_surcharge' => 'required|numeric|min:0'
             ]);
 
             $manifestList = ManifestList::findOrFail($id);
@@ -490,21 +505,23 @@ class ManifestController extends Controller
             if ($duplicate) {
                 $warning = "CN No: {$validatedData['cn_no']} already exists, total_price set to 0";
                 $totalPrice = 0;
-                $miscCharge = 0;
+                // $miscCharge = 0;
             } else {
                 $totalDetails = $this->calculateTotalPriceDetailed(
+                    $validatedData['fuel_surcharge'],
+                    $validatedData['misc_charge'],
                     $validatedData['origin'],
                     $validatedData['destination'],
                     $validatedData['consignor_id'],
                     $validatedData['kg']
                 );
                 $totalPrice = $totalDetails['total'];
-
-                $miscCharge = $this->getMiscCharge(
-                    $validatedData['consignor_id'],
-                    $validatedData['origin'],
-                    $validatedData['destination']
-                );
+                $basePrice = $totalDetails['base_price'];
+                // $miscCharge = $this->getMiscCharge(
+                //     $validatedData['consignor_id'],
+                //     $validatedData['origin'],
+                //     $validatedData['destination']
+                // );
 
                 $warning = null;
             }
@@ -520,7 +537,10 @@ class ManifestController extends Controller
                 'origin' => $validatedData['origin'],
                 'destination' => $validatedData['destination'],
                 'remarks' => $validatedData['remarks'] ?? null,
-                'misc_charge' => number_format($miscCharge, 2, '.', ''),
+                'misc_charge' => number_format($validatedData['misc_charge'], 2, '.', ''),
+                'fuel_surcharge' => number_format($validatedData['fuel_surcharge'], 2, '.', ''),
+                'base_price' => number_format($basePrice, 2, '.', ''),
+                // 'misc_charge' => number_format($miscCharge, 2, '.', ''),
             ]);
 
             $manifestList->refresh();
@@ -551,7 +571,7 @@ class ManifestController extends Controller
 
 
 
-    private function calculateTotalPriceDetailed($from, $to, $consignorId, $kg)
+    private function calculateTotalPriceDetailed($fuel_surcharge, $miscCharge, $from, $to, $consignorId, $kg)
     {
         $client = Client::find($consignorId);
         if (!$client) {
@@ -579,8 +599,8 @@ class ManifestController extends Controller
             $basePrice = $shippingRate->minimum_price + $extraCost;
         }
 
-        $miscCharge = $shippingRate->misc_charge ?? 0;
-        $total = $basePrice + $miscCharge;
+        // $miscCharge = $shippingRate->misc_charge ?? 0;
+        $total = $basePrice * $fuel_surcharge + $miscCharge;
 
         return [
             'base_price' => (float) $basePrice,
@@ -646,7 +666,7 @@ class ManifestController extends Controller
     /**
      * 计算 total_price
      */
-    private function calculateTotalPrice($from, $to, $consignorId, $kg)
+    private function calculateTotalPrice($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
     {
         // 1️⃣ 获取 consignor 的运费计划
         $client = Client::find($consignorId);
@@ -672,8 +692,10 @@ class ManifestController extends Controller
         // 计算额外重量费用
         $extraWeight = $kg - $shippingRate->minimum_weight;
         $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
-
-        return (float) ($shippingRate->minimum_price + $extraCost);
+        return [
+            'base_price' => (float) ($shippingRate->minimum_price + $extraCost),
+            'total' => (float) (($shippingRate->minimum_price + $extraCost) * $fuel_surcharge + $misc_charge)
+        ];
     }
 }
 

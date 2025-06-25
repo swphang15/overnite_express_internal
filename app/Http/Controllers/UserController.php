@@ -15,15 +15,19 @@ class UserController extends Controller
     public function createUser(Request $request)
     {
         $user = $request->user();
-        if (!in_array($user->role, ['superadmin', 'admin'])) {
+        if (!in_array($user->role, ['superadmin', 'master'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->whereNull('deleted_at'),
+            ],
             'password' => 'required|min:6',
-            'role' => 'required|in:admin,user',
+            'role' => 'required|in:master,admin,user',
         ]);
 
         $user = User::create([
@@ -43,7 +47,7 @@ class UserController extends Controller
     {
         $response = null;
 
-        if (!in_array($request->user()->role, ['admin', 'superadmin'])) {
+        if (!in_array($request->user()->role, ['master', 'superadmin'])) {
             $response = response()->json(['message' => 'Forbidden'], 403);
         } elseif ($id) {
             $user = User::find($id);
@@ -51,7 +55,7 @@ class UserController extends Controller
                 ? response()->json($user)
                 : response()->json(['message' => 'User not found'], 404);
         } else {
-            $users = User::whereNotIn('role', ['superadmin'])->get(); // Exclude only superadmin
+            $users = User::whereNotIn('role', ['superadmin',])->get(); // Exclude only superadmin
             $response = response()->json($users);
         }
 
@@ -62,7 +66,7 @@ class UserController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->role, ['superadmin', 'admin'])) {
+        if (!in_array($user->role, ['superadmin', 'admin', 'master'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -84,7 +88,7 @@ class UserController extends Controller
     {
         $authUser = $request->user();
 
-        if (!in_array($authUser->role, ['superadmin', 'admin'])) {
+        if (!in_array($authUser->role, ['superadmin', 'master'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -102,7 +106,7 @@ class UserController extends Controller
                 'email',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
-            'role' => 'sometimes|string|in:superadmin,admin,user',
+            'role' => 'sometimes|string|in:superadmin,master,admin,user',
         ]);
 
         $user->update($validatedData);
@@ -147,7 +151,30 @@ class UserController extends Controller
     }
 
 
+    public function updateUserPassword(Request $request, User $user)
+    {
+        $auth_user = $request->user();
+        if (!$auth_user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        if ($auth_user->role !== "master") {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
+        $validatedData = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'password.required' => 'New password is required.',
+            'password.min' => 'New password must be at least 6 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
+        ]);
+
+        $user->update([
+            'password' => Hash::make($validatedData['password']),
+        ]);
+
+        return response()->json(['message' => 'Password updated successfully.']);
+    }
 
     /**
      * 删除用户（仅限 superadmin）
@@ -155,7 +182,7 @@ class UserController extends Controller
     public function deleteUser(Request $request, $id)
     {
         $user = $request->user();
-        if (!in_array($user->role, ['superadmin', 'admin'])) {
+        if (!in_array($user->role, ['superadmin',  'master'])) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
