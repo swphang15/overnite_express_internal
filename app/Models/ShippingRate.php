@@ -20,6 +20,7 @@ class ShippingRate extends Model
         'minimum_weight',
         'additional_price_per_kg',
         'misc_charge',
+        'fuel_surcharge'
     ];
 
     // 关联 ShippingPlan

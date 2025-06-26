@@ -34,6 +34,7 @@ class ShippingRateController extends Controller
             'minimum_weight' => 'required|numeric|min:0',
             'additional_price_per_kg' => 'required|numeric|min:0',
             'misc_charge' => 'required|numeric|min:0',
+            'fuel_surcharge' => 'required|numeric|min:0',
         ]);
 
         // 检查是否已有相同 origin 和 destination 的记录
@@ -82,6 +83,7 @@ class ShippingRateController extends Controller
             'minimum_weight' => 'sometimes|numeric|min:0',
             'additional_price_per_kg' => 'sometimes|numeric|min:0',
             'misc_charge' => 'sometimes|numeric|min:0', // ✅ 新增字段验证
+            'fuel_surcharge' => 'required|numeric|min:0',
         ]);
 
         // 获取当前 shipping plan id
@@ -149,6 +151,7 @@ class ShippingRateController extends Controller
                     'origin' => $rate->origin,
                     'destination' => $rate->destination,
                     'misc_charge' => $rate->misc_charge,
+                    'fuel_surcharge' => $rate->fuel_surcharge,
                 ];
             }),
             'origin' => $origins,

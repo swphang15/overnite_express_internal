@@ -121,6 +121,7 @@ class ShippingController extends Controller
             'shipping_rates.*.minimum_weight' => 'required|numeric|min:0',
             'shipping_rates.*.additional_price_per_kg' => 'required|numeric|min:0',
             'shipping_rates.*.misc_charge' => 'required|numeric|min:0',
+            'shipping_rates.*.fuel_surcharge' => 'required|numeric|min:0',
         ]);
 
 
@@ -160,6 +161,7 @@ class ShippingController extends Controller
                     'minimum_weight' => $rateData['minimum_weight'],
                     'additional_price_per_kg' => $rateData['additional_price_per_kg'],
                     'misc_charge' => $rateData['misc_charge'] ?? 0, // ✅ 加进去，默认值 0
+                    'fuel_surcharge' => $rateData['fuel_surcharge'] ?? 0, // ✅ 加进去，默认值 0
                 ]);
             }
 

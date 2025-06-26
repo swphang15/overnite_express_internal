@@ -170,6 +170,7 @@ class ManifestInfoController extends Controller
                     $totalPrice = 0;
                     $basePrice = 0;
                 } else {
+                    $basePrice = 0;
                     if (isset($validatedData['manifest_info_id'])) {
                         $totalDetails = $this->calculateTotalPriceDetailed(
                             $list['fuel_surcharge'],
