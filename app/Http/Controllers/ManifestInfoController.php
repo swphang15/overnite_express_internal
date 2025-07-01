@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\ManifestTrait;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,8 @@ use Exception;
 
 class ManifestInfoController extends Controller
 {
+
+    use ManifestTrait;
     /**
      * 获取预计总价格
      */
@@ -65,7 +68,7 @@ class ManifestInfoController extends Controller
             }
 
             // ====== 新版：修改 calculateTotalPrice 返回结构 ======
-            $priceDetails = $this->calculateTotalPriceDetailed(
+            $priceDetails = $this->calculate_total_price(
                 $validatedData['fuel_surcharge'],
                 $validatedData['misc_charge'],
                 $validatedData['origin'],
@@ -172,7 +175,7 @@ class ManifestInfoController extends Controller
                 } else {
                     $basePrice = 0;
                     if (isset($validatedData['manifest_info_id'])) {
-                        $totalDetails = $this->calculateTotalPriceDetailed(
+                        $totalDetails = $this->calculate_total_price(
                             $list['fuel_surcharge'],
                             $list['misc_charge'],
                             $list['origin'],
@@ -291,43 +294,43 @@ class ManifestInfoController extends Controller
     }
 
 
-    private function calculateTotalPriceDetailed($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
-    {
-        $client = Client::find($consignorId);
-        if (!$client) {
-            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
-        }
+    // private function calculateTotalPriceDetailed($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
+    // {
+    //     $client = Client::find($consignorId);
+    //     if (!$client) {
+    //         return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+    //     }
 
-        $from = strtoupper($from);
-        $to = strtoupper($to);
+    //     $from = strtoupper($from);
+    //     $to = strtoupper($to);
 
-        $shippingRate = ShippingRate::where('origin', $from)
-            ->where('destination', $to)
-            ->where('shipping_plan_id', $client->shipping_plan_id)
-            ->first();
+    //     $shippingRate = ShippingRate::where('origin', $from)
+    //         ->where('destination', $to)
+    //         ->where('shipping_plan_id', $client->shipping_plan_id)
+    //         ->first();
 
-        if (!$shippingRate) {
-            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
-        }
+    //     if (!$shippingRate) {
+    //         return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+    //     }
 
-        // 🚚 关键修改点：超重部分向上取整计算
-        if ($kg <= $shippingRate->minimum_weight) {
-            $basePrice = $shippingRate->minimum_price;
-        } else {
-            $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
-            $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
-            $basePrice = $shippingRate->minimum_price + $extraCost;
-        }
+    //     // 🚚 关键修改点：超重部分向上取整计算
+    //     if ($kg <= $shippingRate->minimum_weight) {
+    //         $basePrice = $shippingRate->minimum_price;
+    //     } else {
+    //         $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
+    //         $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+    //         $basePrice = $shippingRate->minimum_price + $extraCost;
+    //     }
 
-        // $miscCharge = $shippingRate->misc_charge ?? 0;
-        $total = $basePrice * $fuel_surcharge + $misc_charge;
+    //     // $miscCharge = $shippingRate->misc_charge ?? 0;
+    //     $total = $basePrice * $fuel_surcharge + $misc_charge;
 
-        return [
-            'base_price' => (float) $basePrice,
-            'misc_charge' => (float) $misc_charge,
-            'total' => (float) $total,
-        ];
-    }
+    //     return [
+    //         'base_price' => (float) $basePrice,
+    //         'misc_charge' => (float) $misc_charge,
+    //         'total' => (float) $total,
+    //     ];
+    // }
 
 
 

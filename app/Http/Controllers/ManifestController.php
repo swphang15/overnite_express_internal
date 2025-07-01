@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ManifestExport;
 use App\Exports\ManifestExcelExport;
+use App\ManifestTrait;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -23,6 +24,9 @@ use Carbon\Carbon;
 
 class ManifestController extends Controller
 {
+
+    use ManifestTrait;
+
     public function checkRouteValidity(Request $request)
     {
         try {
@@ -178,7 +182,7 @@ class ManifestController extends Controller
                 $grams = ($list['kg'] - $fullKg) * 1000;
 
                 // 计算 total_price
-                $totalDetails = $this->calculateTotalPrice(
+                $totalDetails = $this->calculate_total_price(
                     $list['fuel_surcharge'],
                     $list['misc_charge'],
                     $manifestInfo->from,
@@ -507,7 +511,7 @@ class ManifestController extends Controller
                 $totalPrice = 0;
                 // $miscCharge = 0;
             } else {
-                $totalDetails = $this->calculateTotalPriceDetailed(
+                $totalDetails = $this->calculate_total_price(
                     $validatedData['fuel_surcharge'],
                     $validatedData['misc_charge'],
                     $validatedData['origin'],
@@ -571,43 +575,43 @@ class ManifestController extends Controller
 
 
 
-    private function calculateTotalPriceDetailed($fuel_surcharge, $miscCharge, $from, $to, $consignorId, $kg)
-    {
-        $client = Client::find($consignorId);
-        if (!$client) {
-            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
-        }
+    // private function calculateTotalPriceDetailed($fuel_surcharge, $miscCharge, $from, $to, $consignorId, $kg)
+    // {
+    //     $client = Client::find($consignorId);
+    //     if (!$client) {
+    //         return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+    //     }
 
-        $from = strtoupper($from);
-        $to = strtoupper($to);
+    //     $from = strtoupper($from);
+    //     $to = strtoupper($to);
 
-        $shippingRate = ShippingRate::where('origin', $from)
-            ->where('destination', $to)
-            ->where('shipping_plan_id', $client->shipping_plan_id)
-            ->first();
+    //     $shippingRate = ShippingRate::where('origin', $from)
+    //         ->where('destination', $to)
+    //         ->where('shipping_plan_id', $client->shipping_plan_id)
+    //         ->first();
 
-        if (!$shippingRate) {
-            return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
-        }
+    //     if (!$shippingRate) {
+    //         return ['base_price' => 0, 'misc_charge' => 0, 'total' => 0];
+    //     }
 
-        // 🚚 关键修改点：超重部分向上取整计算
-        if ($kg <= $shippingRate->minimum_weight) {
-            $basePrice = $shippingRate->minimum_price;
-        } else {
-            $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
-            $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
-            $basePrice = $shippingRate->minimum_price + $extraCost;
-        }
+    //     // 🚚 关键修改点：超重部分向上取整计算
+    //     if ($kg <= $shippingRate->minimum_weight) {
+    //         $basePrice = $shippingRate->minimum_price;
+    //     } else {
+    //         $extraWeight = ceil($kg - $shippingRate->minimum_weight); // 👈 向上取整！
+    //         $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+    //         $basePrice = $shippingRate->minimum_price + $extraCost;
+    //     }
 
-        // $miscCharge = $shippingRate->misc_charge ?? 0;
-        $total = $basePrice * $fuel_surcharge + $miscCharge;
+    //     // $miscCharge = $shippingRate->misc_charge ?? 0;
+    //     $total = $basePrice + ($fuel_surcharge * $kg) + $miscCharge;
 
-        return [
-            'base_price' => (float) $basePrice,
-            'misc_charge' => (float) $miscCharge,
-            'total' => (float) $total,
-        ];
-    }
+    //     return [
+    //         'base_price' => (float) $basePrice,
+    //         'misc_charge' => (float) $miscCharge,
+    //         'total' => (float) $total,
+    //     ];
+    // }
 
 
 
@@ -666,37 +670,37 @@ class ManifestController extends Controller
     /**
      * 计算 total_price
      */
-    private function calculateTotalPrice($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
-    {
-        // 1️⃣ 获取 consignor 的运费计划
-        $client = Client::find($consignorId);
-        if (!$client) {
-            throw new Exception("Consignor not found.");
-        }
+    // private function calculateTotalPrice($fuel_surcharge, $misc_charge, $from, $to, $consignorId, $kg)
+    // {
+    //     // 1️⃣ 获取 consignor 的运费计划
+    //     $client = Client::find($consignorId);
+    //     if (!$client) {
+    //         throw new Exception("Consignor not found.");
+    //     }
 
-        // 2️⃣ 获取 shipping_rate
-        $shippingRate = ShippingRate::where('origin', $from)
-            ->where('destination', $to)
-            ->where('shipping_plan_id', $client->shipping_plan_id)
-            ->first();
+    //     // 2️⃣ 获取 shipping_rate
+    //     $shippingRate = ShippingRate::where('origin', $from)
+    //         ->where('destination', $to)
+    //         ->where('shipping_plan_id', $client->shipping_plan_id)
+    //         ->first();
 
-        if (!$shippingRate) {
-            throw new Exception("Shipping rate not found.");
-        }
+    //     if (!$shippingRate) {
+    //         throw new Exception("Shipping rate not found.");
+    //     }
 
-        // 3️⃣ 计算运费
-        if ($kg <= $shippingRate->minimum_weight) {
-            return (float) $shippingRate->minimum_price;
-        }
+    //     // 3️⃣ 计算运费
+    //     if ($kg <= $shippingRate->minimum_weight) {
+    //         return (float) $shippingRate->minimum_price;
+    //     }
 
-        // 计算额外重量费用
-        $extraWeight = $kg - $shippingRate->minimum_weight;
-        $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
-        return [
-            'base_price' => (float) ($shippingRate->minimum_price + $extraCost),
-            'total' => (float) (($shippingRate->minimum_price + $extraCost) * $fuel_surcharge + $misc_charge)
-        ];
-    }
+    //     // 计算额外重量费用
+    //     $extraWeight = $kg - $shippingRate->minimum_weight;
+    //     $extraCost = $extraWeight * $shippingRate->additional_price_per_kg;
+    //     return [
+    //         'base_price' => (float) ($shippingRate->minimum_price + $extraCost),
+    //         'total' => (float) (($shippingRate->minimum_price + $extraCost) + ($fuel_surcharge * $kg) + $misc_charge)
+    //     ];
+    // }
 }
 
 // namespace App\Http\Controllers;
