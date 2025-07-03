@@ -24,7 +24,7 @@ Route::get('dashboard/count', [StatsController::class, 'getCounts']);
 
 Route::get('/manifest/pdf/{manifestId}', [ManifestController::class, 'downloadPdf']);
 
-
+// Route::get('/fix', [ManifestController::class, 'fix_manifest_infos']);
 
 
 

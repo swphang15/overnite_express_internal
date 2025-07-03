@@ -21,6 +21,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 
 class ManifestController extends Controller
 {
@@ -146,7 +147,10 @@ class ManifestController extends Controller
                 'lists' => 'required|array|min:1',
                 'lists.*.consignor_id' => 'required|exists:clients,id',
                 'lists.*.consignee_name' => 'required|string',
-                'lists.*.cn_no' => 'required|numeric|unique:manifest_lists,cn_no',
+                'lists.*.cn_no' => [
+                    'required',
+                    Rule::unique('manifest_lists', 'cn_no')->whereNull('deleted_at'),
+                ],
                 'lists.*.pcs' => 'required|integer|min:1',
                 'lists.*.kg' => 'required|numeric|min:0',
                 'lists.*.total_price' => 'nullable|numeric|min:0',
@@ -225,7 +229,7 @@ class ManifestController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Something went wrong',
-                'error' => $e->getMessage()
+                'error' => $e
             ], 500);
         }
     }
@@ -257,36 +261,111 @@ class ManifestController extends Controller
             // 获取搜索条件
             $search = $request->input('search');
 
+            $sortBy = $request->input('sort_by');
+            $sortOrder = $request->input('sort_order', 'desc');
+
+            $fromFilters = $request->input('from');
+            $toFilters = $request->input('to');
+            $createdByFilters = $request->input('created_by');
+
+            $searchFields = $request->input('search_fields');
+
+            $sortableFields = ['manifest_no', 'date', 'awb_no', 'to', 'from', 'flt', 'created_at'];
             // 查询数据库
-            $query = ManifestInfo::with('user:id,name')
-                ->latest(); // 按 created_at 倒序排序
+            $query = ManifestInfo::with('user:id,name');
 
             // 如果提供了 start_date 和 end_date，就进行过滤
             if ($startDate && $endDate) {
                 $query->whereBetween('date', [$startDate, $endDate]);
             }
-
             // 如果提供了 search 条件，就进行模糊搜索
-            if ($search) {
-                $query->where(function ($query) use ($search) {
-                    $query->where('manifest_no', 'like', "%$search%")
-                        ->orWhere('date', 'like', "%$search%")
-                        ->orWhere('awb_no', 'like', "%$search%")
-                        ->orWhere('to', 'like', "%$search%")
-                        ->orWhere('from', 'like', "%$search%")
-                        ->orWhere('flt', 'like', "%$search%")
-                        ->orWhereHas('user', function ($q) use ($search) {
-                            $q->where('name', 'like', "%$search%");
-                        });
+            if ($search && is_array($searchFields) && count($searchFields) > 0) {
+                $query->where(function ($q) use ($search, $searchFields) {
+                    $first = true;
+
+                    foreach ($searchFields as $field) {
+                        if (in_array($field, ['manifest_no', 'awb_no'])) {
+                            if ($first) {
+                                $q->where($field, 'like', "%$search%");
+                                $first = false;
+                            } else {
+                                $q->orWhere($field, 'like', "%$search%");
+                            }
+                        }
+                    }
                 });
             }
 
+
+            if (is_array($fromFilters) && count($fromFilters) > 0) {
+                $query->whereIn('from', $fromFilters);
+            }
+            if (is_array($toFilters) && count($toFilters) > 0) {
+                $query->whereIn('to', $toFilters);
+            }
+            if (is_array($createdByFilters) && count($createdByFilters) > 0) {
+                $query->whereIn('user_id', $createdByFilters);
+            }
+
+            if ($sortBy && in_array($sortBy, $sortableFields)) {
+                $query->orderBy($sortBy, in_array(strtolower($sortOrder), ['asc', 'desc']) ? $sortOrder : 'desc');
+            } else {
+                $query->latest();
+            }
             // 分页，每页 $perPage 条
             $manifests = $query->paginate($perPage);
 
+            $froms = ManifestInfo::pluck('from')
+                ->filter()
+                ->unique()
+                ->mapWithKeys(function ($item) {
+                    return [
+                        $item => [
+                            'text' => $item,
+                        ]
+                    ];
+                });
+            $tos = ManifestInfo::pluck('to')
+                ->filter()
+                ->unique()
+                ->mapWithKeys(function ($item) {
+                    return [
+                        $item => [
+                            'text' => $item,
+                        ]
+                    ];
+                });
+
+            $createdBys = ManifestInfo::with('user:id,name')
+                ->get()
+                ->pluck('user')
+                ->filter()
+                ->unique('id')
+                ->mapWithKeys(function ($user) {
+                    return [
+                        $user->id => [
+                            'text' => $user->name,
+                        ]
+                    ];
+                });
+
+            $searchFields = [
+                [
+                    "value" => "manifest_no",
+                    "label" => "Manifest No",
+                ],
+                [
+                    "value" => "awb_no",
+                    "label" => "AWB No"
+                ]
+            ];
             // 返回 JSON 数据
             return response()->json([
                 'data' => $manifests->items(), // 当前页数据
+                'froms' => $froms,
+                'tos' => $tos,
+                'createdBys' => $createdBys,
+                'searchFields' => $searchFields,
                 'pagination' => [
                     'total' => $manifests->total(), // 总条数
                     'per_page' => $manifests->perPage(), // 每页数量
@@ -305,14 +384,14 @@ class ManifestController extends Controller
     }
 
 
-
-
-
     public function show($id)
     {
         try {
             // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
             $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
+
+            $manifestInfo->totalWeight = number_format($manifestInfo->manifestLists->sum('kg') + $manifestInfo->manifestLists->sum('gram') / 1000, 2);
+            $manifestInfo->totalPcs = $manifestInfo->manifestLists->sum('pcs');
 
             // 修改 manifest_lists，将 kg 和 gram 合并，并调整 consignor_name 的位置
             $manifestInfo->manifestLists->transform(function ($item) {
@@ -665,7 +744,37 @@ class ManifestController extends Controller
         }
     }
 
+    public function fix_manifest_infos()
+    {
+        $manifests = ManifestList::all();
+        foreach ($manifests as $manifest) {
+            $client = Client::find($manifest->consignor_id);
 
+            if (!$client) {
+                continue;
+            }
+            $rate = ShippingRate::where("shipping_plan_id", $client->shipping_plan_id)->where("origin", $manifest->origin)->where("destination", $manifest->destination)->first();
+            if (!$rate) {
+                continue;
+            }
+            $totalDetails = $this->calculate_total_price(
+                $rate->fuel_surcharge,
+                $rate->misc_charge,
+                $rate->origin,
+                $rate->destination,
+                $manifest->consignor_id,
+                $manifest->kg + ($manifest->gram / 1000)
+            );
+
+            $manifest->update([
+                'total_price' => number_format($totalDetails["total"], 2, '.', ''),
+                'misc_charge' => number_format($rate->misc_charge, 2, '.', ''),
+                'fuel_surcharge' => number_format($rate->fuel_surcharge, 2, '.', ''),
+                'base_price' => number_format($totalDetails["base_price"], 2, '.', ''),
+            ]);
+        }
+        return $manifests;
+    }
 
     /**
      * 计算 total_price

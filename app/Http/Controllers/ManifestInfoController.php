@@ -14,6 +14,7 @@ use App\Models\ManifestList;
 use App\Models\Client;
 use App\Models\ShippingRate;
 use Exception;
+use Illuminate\Validation\Rule;
 
 class ManifestInfoController extends Controller
 {
@@ -30,7 +31,7 @@ class ManifestInfoController extends Controller
                 'destination' => 'required|string',
                 'consignor_id' => 'required|exists:clients,id',
                 'kg' => 'required|numeric|min:0',
-                'cn_no' => 'required|numeric',
+                'cn_no' => 'required',
                 'misc_charge' => 'required|numeric',
                 'fuel_surcharge' => 'required|numeric',
             ]);
@@ -131,7 +132,7 @@ class ManifestInfoController extends Controller
                 'manifest_lists' => 'required|array|min:1',
                 'manifest_lists.*.consignor_id' => 'required|exists:clients,id',
                 'manifest_lists.*.consignee_name' => 'required|string',
-                'manifest_lists.*.cn_no' => 'required|numeric',
+                'manifest_lists.*.cn_no' => 'required',
                 'manifest_lists.*.pcs' => 'required|integer|min:1',
                 'manifest_lists.*.kg' => 'required|numeric|min:0',
                 'manifest_lists.*.discount' => 'sometimes|nullable|numeric|min:0',

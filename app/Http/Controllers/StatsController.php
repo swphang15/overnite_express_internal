@@ -15,29 +15,44 @@ class StatsController extends Controller
 {
     public function getCounts()
     {
-        // 获取今年年份
         $currentYear = Carbon::now()->year;
 
-        // 获取 1-12 月的总价
-        $monthlyTotalPrice = ManifestList::selectRaw('MONTH(created_at) as month, SUM(total_price) as total_price')
-            ->whereYear('created_at', $currentYear)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->pluck('total_price', 'month')
-            ->toArray();
+        // Get all clients
+        $clients = Client::select('id', 'name')->get();
 
-        // 确保返回 1-12 月份，即使没有数据也填充 0
-        $monthlyTotals = [];
-        for ($month = 1; $month <= 12; $month++) {
-            $monthlyTotals[$month] = $monthlyTotalPrice[$month] ?? 0;
+        // Get monthly total_price grouped by client and month
+        $clientMonthlyData = ManifestList::selectRaw('consignor_id, MONTH(created_at) as month, SUM(total_price) as total_price')
+            ->whereYear('created_at', $currentYear)
+            ->groupBy('consignor_id', 'month')
+            ->get();
+
+        // Initialize result arrays
+        $clientMonthlyTotals = [];
+        $allMonthlyTotals = array_fill(1, 12, 0);
+
+        // Build each client's monthly total
+        foreach ($clients as $client) {
+            $monthly = array_fill(1, 12, 0);
+
+            foreach ($clientMonthlyData as $data) {
+                if ($data->consignor_id == $client->id) {
+                    $monthly[$data->month] = (float) $data->total_price;
+                    $allMonthlyTotals[$data->month] += (float) $data->total_price;
+                }
+            }
+
+            $clientMonthlyTotals[$client->name] = $monthly;
         }
+
+        // Prepend "ALL" totals
+        $clientMonthlyTotals = ['ALL' => $allMonthlyTotals] + $clientMonthlyTotals;
 
         return response()->json([
             'clients' => Client::count(),
             'manifest_infos' => ManifestInfo::count(),
             'shipping_plans' => ShippingPlan::count(),
             'users' => User::count(),
-            'monthly_total_price' => $monthlyTotals
+            'monthly_total_price' => $clientMonthlyTotals,
         ]);
     }
 }

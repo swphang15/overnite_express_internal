@@ -31,12 +31,11 @@ trait ManifestTrait
         if (!$shippingRate) {
             return ['base_price' => 0, 'misc_charge' => $misc_charge, 'total' => 0];
         }
-
+        $kg = ceil($kg);
         if ($kg <= $shippingRate->minimum_weight) {
             $basePrice = $shippingRate->minimum_price;
         } else {
-            $extraCost = ($kg - $shippingRate->minimum_weight) * $shippingRate->additional_price_per_kg;
-            $basePrice = $shippingRate->minimum_price + $extraCost;
+            $basePrice = $kg * $shippingRate->additional_price_per_kg;
         }
         $total = $basePrice + ($fuel_surcharge * $kg) + $misc_charge;
 
