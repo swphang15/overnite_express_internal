@@ -284,12 +284,23 @@ class ManifestController extends Controller
                     $first = true;
 
                     foreach ($searchFields as $field) {
-                        if (in_array($field, ['manifest_no', 'awb_no'])) {
+                        if (in_array($field, ['manifest_no', 'awb_no', 'flt'])) {
                             if ($first) {
                                 $q->where($field, 'like', "%$search%");
                                 $first = false;
                             } else {
                                 $q->orWhere($field, 'like', "%$search%");
+                            }
+                        } else if (in_array($field, ['cn_no'])) {
+                            if ($first) {
+                                $q->whereHas('manifestLists', function ($subQuery) use ($search, $field) {
+                                    $subQuery->where($field, '=', "$search");
+                                });
+                                $first = false;
+                            } else {
+                                $q->orWhereHas('manifestLists', function ($subQuery) use ($search, $field) {
+                                    $subQuery->where($field, '=', "$search");
+                                });
                             }
                         }
                     }
@@ -357,6 +368,14 @@ class ManifestController extends Controller
                 [
                     "value" => "awb_no",
                     "label" => "AWB No"
+                ],
+                [
+                    "value" => "flt",
+                    "label" => "FLT"
+                ],
+                [
+                    "value" => "cn_no",
+                    "label" => "CN Number"
                 ]
             ];
             // 返回 JSON 数据
