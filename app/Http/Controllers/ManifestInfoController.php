@@ -266,8 +266,13 @@ class ManifestInfoController extends Controller
     public function getCnNumbers($consignor_id)
     {
         $cnNumbers = ManifestList::where('consignor_id', $consignor_id)
-            ->select('consignee_name', 'cn_no', 'pcs', 'kg', 'origin', 'destination', 'remarks')
+            ->select('consignee_name', 'cn_no', 'pcs', 'kg', 'gram', 'origin', 'destination', 'remarks')
             ->get();
+        $cnNumbers = $cnNumbers->map(function ($item) {
+            $item->kg = $item->kg + ($item->gram / 1000);
+            unset($item->gram); // 移除 gram 字段
+            return $item;
+        });
 
         return response()->json($cnNumbers);
     }
