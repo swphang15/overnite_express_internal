@@ -28,8 +28,8 @@ class ShippingRateController extends Controller
     {
         $request->validate([
             'shipping_plan_id' => 'required|exists:shipping_plans,id',
-            'origin' => 'required|string|max:3',
-            'destination' => 'required|string|max:3',
+            'origin' => 'required|string|max:255',
+            'destination' => 'required|string|max:255',
             'minimum_price' => 'required|numeric|min:0',
             'minimum_weight' => 'required|numeric|min:0',
             'additional_price_per_kg' => 'required|numeric|min:0',
@@ -77,8 +77,8 @@ class ShippingRateController extends Controller
         }
 
         $request->validate([
-            'origin' => 'sometimes|string|max:3',
-            'destination' => 'sometimes|string|max:3',
+            'origin' => 'sometimes|string|max:255',
+            'destination' => 'sometimes|string|max:255',
             'minimum_price' => 'sometimes|numeric|min:0',
             'minimum_weight' => 'sometimes|numeric|min:0',
             'additional_price_per_kg' => 'sometimes|numeric|min:0',
