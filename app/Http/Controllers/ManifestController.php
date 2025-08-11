@@ -408,13 +408,14 @@ class ManifestController extends Controller
         try {
             // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
             $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
+            $manifestInfo->update(['readed' => true]);
 
             $manifestInfo->totalWeight = number_format($manifestInfo->manifestLists->sum('kg') + $manifestInfo->manifestLists->sum('gram') / 1000, 2);
             $manifestInfo->totalPcs = $manifestInfo->manifestLists->sum('pcs');
 
             // 修改 manifest_lists，将 kg 和 gram 合并，并调整 consignor_name 的位置
             $manifestInfo->manifestLists->transform(function ($item) {
-                $item->kg = $item->kg + ($item->gram / 1000);
+                $item->kg = round($item->kg + ($item->gram / 1000), 2);
                 unset($item->gram); // 移除 gram 字段
 
                 // 重新构建 JSON 结构，确保 consignor_name 在 consignor_id 下面
@@ -459,7 +460,6 @@ class ManifestController extends Controller
             $manifestInfo = ManifestInfo::with(['manifestLists' => function ($query) use ($listId) {
                 $query->where('id', $listId);
             }, 'manifestLists.client'])->findOrFail($id);
-
             // 如果没有匹配的 list
             if ($manifestInfo->manifestLists->isEmpty()) {
                 return response()->json(['message' => 'Manifest list not found'], 404);
@@ -607,6 +607,7 @@ class ManifestController extends Controller
             if ($duplicate) {
                 $warning = "CN No: {$validatedData['cn_no']} already exists, total_price set to 0";
                 $totalPrice = 0;
+                $basePrice = 0;
                 // $miscCharge = 0;
             } else {
                 $totalDetails = $this->calculate_total_price(

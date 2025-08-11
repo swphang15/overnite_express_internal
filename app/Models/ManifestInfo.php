@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes; 
-use Illuminate\Database\Eloquent\Relations\HasMany; 
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class ManifestInfo extends Model
 {
     use HasFactory, SoftDeletes;
@@ -20,8 +21,12 @@ class ManifestInfo extends Model
         'flt',
         'manifest_no',
         'user_id', // 加上 user_id
+        'readed'
     ];
-    
+
+    protected $casts = [
+        'readed' => 'boolean'
+    ];
 
     public function manifestLists(): HasMany
     {
@@ -31,6 +36,4 @@ class ManifestInfo extends Model
     {
         return $this->belongsTo(User::class);
     }
-    
-
 }

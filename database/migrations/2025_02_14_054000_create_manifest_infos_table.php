@@ -17,10 +17,10 @@ return new class extends Migration {
             $table->string('from');
             $table->string('flt')->nullable();
             $table->string('manifest_no');
+            $table->boolean('readed')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });
-        
     }
 
     public function down()
