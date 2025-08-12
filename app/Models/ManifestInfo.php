@@ -21,11 +21,6 @@ class ManifestInfo extends Model
         'flt',
         'manifest_no',
         'user_id', // 加上 user_id
-        'readed'
-    ];
-
-    protected $casts = [
-        'readed' => 'boolean'
     ];
 
     public function manifestLists(): HasMany
@@ -35,5 +30,21 @@ class ManifestInfo extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * 获取此manifest的所有已读状态记录
+     */
+    public function readStatuses()
+    {
+        return $this->hasMany(ManifestReadStatus::class);
+    }
+
+    /**
+     * 检查指定用户是否已读此manifest
+     */
+    public function isReadByUser(int $userId): bool
+    {
+        return ManifestReadStatus::isRead($userId, $this->id);
     }
 }

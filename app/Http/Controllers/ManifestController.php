@@ -8,9 +8,11 @@ use App\Models\Client;
 use App\Models\ShippingRate;
 use App\Models\ManifestInfo;
 use App\Models\ManifestList;
+use App\Models\ManifestReadStatus;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use App\Exports\ManifestExport;
 use App\Exports\ManifestExcelExport;
 use App\ManifestTrait;
@@ -326,6 +328,20 @@ class ManifestController extends Controller
             // 分页，每页 $perPage 条
             $manifests = $query->paginate($perPage);
 
+            // 获取当前用户的已读状态
+            $userId = Auth::id();
+            if (!$userId) {
+                return response()->json(['message' => 'User not authenticated'], 401);
+            }
+            
+            $readManifestIds = ManifestReadStatus::getReadManifestIds($userId);
+            
+            // 为每个manifest添加is_read字段
+            $manifests->getCollection()->transform(function ($manifest) use ($readManifestIds) {
+                $manifest->is_read = in_array($manifest->id, $readManifestIds);
+                return $manifest;
+            });
+
             $froms = ManifestInfo::pluck('from')
                 ->filter()
                 ->unique()
@@ -408,10 +424,20 @@ class ManifestController extends Controller
         try {
             // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
             $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
-            $manifestInfo->update(['readed' => true]);
+            
+            // 标记当前用户已读此manifest
+            $userId = Auth::id();
+            if (!$userId) {
+                return response()->json(['message' => 'User not authenticated'], 401);
+            }
+            
+            ManifestReadStatus::markAsRead($userId, $id);
 
             $manifestInfo->totalWeight = number_format($manifestInfo->manifestLists->sum('kg') + $manifestInfo->manifestLists->sum('gram') / 1000, 2);
             $manifestInfo->totalPcs = $manifestInfo->manifestLists->sum('pcs');
+            
+            // 添加当前用户的已读状态
+            $manifestInfo->is_read = true; // 因为刚刚标记为已读
 
             // 修改 manifest_lists，将 kg 和 gram 合并，并调整 consignor_name 的位置
             $manifestInfo->manifestLists->transform(function ($item) {
