@@ -25,7 +25,7 @@ class ManifestInfo extends Model
 
     public function manifestLists(): HasMany
     {
-        return $this->hasMany(ManifestList::class);
+        return $this->hasMany(ManifestList::class)->orderBy('sort_order', 'asc');
     }
     public function user()
     {

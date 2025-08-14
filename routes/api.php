@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/manifest/{id}/{listId}', [ManifestController::class, 'showOneList']);
     Route::put('/manifest-list/{id}', [ManifestController::class, 'updateManifestList']);
     Route::post('/check-route', [ManifestController::class, 'checkRouteValidity']);
+    Route::post('/manifest/{id}/reorder-lists', [ManifestController::class, 'reorderManifestLists']);
 
 
 

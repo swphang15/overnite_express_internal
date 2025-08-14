@@ -28,6 +28,7 @@ class ManifestList extends Model
         'misc_charge',
         'fuel_surcharge',
         'base_price',
+        'sort_order',
     ];
 
     public function manifestInfo()

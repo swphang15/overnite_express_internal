@@ -422,8 +422,10 @@ class ManifestController extends Controller
     public function show($id)
     {
         try {
-            // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)
-            $manifestInfo = ManifestInfo::with(['manifestLists', 'manifestLists.client'])->findOrFail($id);
+            // 获取 ManifestInfo，并加载关联的 ManifestList 和 Client (consignor)，按 sort_order 排序
+            $manifestInfo = ManifestInfo::with(['manifestLists' => function ($query) {
+                $query->orderBy('sort_order', 'asc');
+            }, 'manifestLists.client'])->findOrFail($id);
             
             // 标记当前用户已读此manifest
             $userId = Auth::id();
@@ -461,6 +463,7 @@ class ManifestController extends Controller
                     'destination' => $item->destination,
                     'misc_charge' => $item->misc_charge,
                     'fuel_surcharge' => $item->fuel_surcharge,
+                    'sort_order' => $item->sort_order,
                     'created_at' => $item->created_at,
                     'updated_at' => $item->updated_at,
                     'deleted_at' => $item->deleted_at
@@ -513,6 +516,7 @@ class ManifestController extends Controller
                 'destination' => $list->destination,
                 'misc_charge' => $list->misc_charge,
                 'fuel_surcharge' => $list->fuel_surcharge,
+                'sort_order' => $list->sort_order,
                 'created_at' => $list->created_at,
                 'updated_at' => $list->updated_at,
                 'deleted_at' => $list->deleted_at
@@ -856,6 +860,52 @@ class ManifestController extends Controller
     //         'total' => (float) (($shippingRate->minimum_price + $extraCost) + ($fuel_surcharge * $kg) + $misc_charge)
     //     ];
     // }
+
+    /**
+     * Reorder manifest lists based on drag and drop
+     */
+    public function reorderManifestLists(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'manifest_lists' => 'required|array',
+                'manifest_lists.*.id' => 'required|integer|exists:manifest_lists,id',
+                'manifest_lists.*.sort_order' => 'required|integer|min:0',
+            ]);
+
+            // Verify that all manifest lists belong to the specified manifest
+            $manifestInfo = ManifestInfo::findOrFail($id);
+            $manifestListIds = $manifestInfo->manifestLists()->pluck('id')->toArray();
+            
+            foreach ($request->manifest_lists as $item) {
+                if (!in_array($item['id'], $manifestListIds)) {
+                    return response()->json([
+                        'message' => 'One or more manifest lists do not belong to this manifest'
+                    ], 400);
+                }
+            }
+
+            // Update sort orders
+            foreach ($request->manifest_lists as $item) {
+                ManifestList::where('id', $item['id'])
+                    ->update(['sort_order' => $item['sort_order']]);
+            }
+
+            return response()->json([
+                'message' => 'Manifest lists reordered successfully'
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Manifest not found'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 
 // namespace App\Http\Controllers;
