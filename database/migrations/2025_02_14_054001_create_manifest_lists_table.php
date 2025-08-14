@@ -23,6 +23,7 @@ return new class extends Migration {
             $table->string('origin');
             $table->string('destination');
             $table->decimal('fuel_surcharge', 10, 2)->default(0);
+            $table->integer('sort_order')->default(0);
             $table->timestamps();
             $table->softDeletes(); // 软删除字段 deleted_at
         });
