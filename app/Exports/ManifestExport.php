@@ -23,7 +23,10 @@ class ManifestExport implements FromView
     {
         // 获取 Manifest 数据
         $manifestInfo = ManifestInfo::findOrFail($manifestId);
-        $manifestLists = ManifestList::where('manifest_info_id', $manifestInfo->id)->get();
+        // 按照 drag sort 的 sort_order 排序获取 manifestLists
+        $manifestLists = ManifestList::where('manifest_info_id', $manifestInfo->id)
+            ->orderBy('sort_order', 'asc')
+            ->get();
 
         // 获取字段值
         $to = $manifestInfo->to;
