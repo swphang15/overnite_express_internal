@@ -36,13 +36,24 @@ class ManifestInfoController extends Controller
                 'fuel_surcharge' => 'required|numeric',
             ]);
 
-            // 检查 CN No 是否已存在
-            $existingManifest = ManifestList::where('cn_no', $validatedData['cn_no'])->exists();
+            // 计算本次价格
+            $priceDetails = $this->calculate_total_price(
+                $validatedData['fuel_surcharge'],
+                $validatedData['misc_charge'],
+                $validatedData['origin'],
+                $validatedData['destination'],
+                $validatedData['consignor_id'],
+                $validatedData['kg']
+            );
 
-            if ($existingManifest) {
+            // 如果已存在相同 CN NO，仅提示：总计会按最大值统计，本行价格正常返回
+            $existingMax = ManifestList::where('cn_no', $validatedData['cn_no'])->exists();
+            if ($existingMax) {
                 return response()->json([
-                    'estimated_total_price' => "0.00",
-                    'message' => "CN No: {$validatedData['cn_no']} already exists, total price set to 0."
+                    'base_price' => number_format($priceDetails['base_price'], 2, '.', ''),
+                    'misc_charge' => number_format($priceDetails['misc_charge'], 2, '.', ''),
+                    'estimated_total_price' => number_format($priceDetails['total'], 2, '.', ''),
+                    'message' => "CN No: {$validatedData['cn_no']} already exists. Invoice total will count the maximum among duplicates; this row keeps its own price.",
                 ], 200);
             }
 
@@ -67,16 +78,6 @@ class ManifestInfoController extends Controller
                     'message' => 'Route not found. Please double-check the origin and destination you have selected.'
                 ], 400);
             }
-
-            // ====== 新版：修改 calculateTotalPrice 返回结构 ======
-            $priceDetails = $this->calculate_total_price(
-                $validatedData['fuel_surcharge'],
-                $validatedData['misc_charge'],
-                $validatedData['origin'],
-                $validatedData['destination'],
-                $validatedData['consignor_id'],
-                $validatedData['kg']
-            );
 
             return response()->json([
                 'base_price' => number_format($priceDetails['base_price'], 2, '.', ''),
@@ -167,29 +168,31 @@ class ManifestInfoController extends Controller
             $warningMessages = [];
 
             $manifestLists = collect($validatedData['manifest_lists'])->map(function ($list) use ($manifestInfo, $validatedData, &$warningMessages) {
-                $existingManifest = ManifestList::where('cn_no', $list['cn_no'])->exists();
-
-                if ($existingManifest) {
-                    $warningMessages[] = "CN No: {$list['cn_no']} already exists, the total price will be set to 0";
-                    $totalPrice = 0;
-                    $basePrice = 0;
+                // 计算当前输入的价格
+                $currentBasePrice = 0;
+                if (isset($validatedData['manifest_info_id'])) {
+                    $totalDetails = $this->calculate_total_price(
+                        $list['fuel_surcharge'],
+                        $list['misc_charge'],
+                        $list['origin'],
+                        $list['destination'],
+                        $list['consignor_id'],
+                        $list['kg']
+                    );
+                    $currentTotal = (float) $totalDetails['total'];
+                    $currentBasePrice = (float) $totalDetails['base_price'];
                 } else {
-                    $basePrice = 0;
-                    if (isset($validatedData['manifest_info_id'])) {
-                        $totalDetails = $this->calculate_total_price(
-                            $list['fuel_surcharge'],
-                            $list['misc_charge'],
-                            $list['origin'],
-                            $list['destination'],
-                            $list['consignor_id'],
-                            $list['kg']
-                        );
-                        $totalPrice = $totalDetails['total'];
-                        $basePrice = $totalDetails['base_price'];
-                    } else {
-                        $totalPrice = $list['total_price'];
-                    }
+                    $currentTotal = (float) $list['total_price'];
                 }
+
+                // 如果已存在同 CN NO，仅提示；本行仍按自身价格保存
+                $exists = ManifestList::where('cn_no', $list['cn_no'])->exists();
+                if ($exists) {
+                    $warningMessages[] = "CN No: {$list['cn_no']} already exists, invoice total will use the maximum among duplicates. This row keeps its own calculated price.";
+                }
+
+                $totalPrice = $currentTotal;
+                $basePrice = $currentBasePrice;
 
                 // ✅ 正确抓取 misc_charge
                 // $miscCharge = $this->getMiscCharge($list['consignor_id'], $list['origin'], $list['destination']);
@@ -374,6 +377,23 @@ class ManifestInfoController extends Controller
 
         $manifests = $query->paginate($perPage);
 
+        // 计算：按同一 cn_no 取最大 total_price 后的汇总金额（受相同过滤条件约束）
+        $aggregateQuery = DB::table('manifest_lists')
+            ->join('manifest_infos', 'manifest_lists.manifest_info_id', '=', 'manifest_infos.id')
+            ->where('manifest_lists.consignor_id', $request->consignor_id)
+            ->whereNull('manifest_lists.deleted_at')
+            ->whereNull('manifest_infos.deleted_at')
+            ->groupBy('manifest_lists.cn_no')
+            ->select(DB::raw('manifest_lists.cn_no, MAX(manifest_lists.total_price) AS max_price'));
+
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $start_date = $request->start_date . " 00:00:00";
+            $end_date = $request->end_date . " 23:59:59";
+            $aggregateQuery->whereBetween('manifest_infos.date', [$start_date, $end_date]);
+        }
+
+        $sumByMax = (float) ($aggregateQuery->get()->sum('max_price'));
+
         return response()->json([
             'data' => $manifests->items(),
             'pagination' => [
@@ -384,6 +404,8 @@ class ManifestInfoController extends Controller
                 'next_page_url' => $manifests->nextPageUrl(),
                 'prev_page_url' => $manifests->previousPageUrl(),
             ],
+            // 新增：按 cn_no 取最大值后的总和，用于前端显示“应计总额”
+            'sum_by_max_cn_no' => number_format($sumByMax, 2, '.', ''),
         ]);
     }
 }

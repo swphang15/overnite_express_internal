@@ -16,6 +16,7 @@ use App\Http\Controllers\ShippingRateController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\DBBackupController;
 use App\Http\Controllers\AccessController;
+use App\Http\Controllers\InvoicePriceController;
 
 Route::middleware('auth:sanctum')->post('/db-backup', [DBBackupController::class, 'downloadBackupWithPDO']);
 
@@ -142,6 +143,14 @@ Route::delete('/manifests/{id}', [ManifestController::class, 'destroy']);
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// Invoice Price Management Routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/invoice/update-prices', [InvoicePriceController::class, 'updateManifestPrices']);
+    Route::get('/invoice/processed-data', [InvoicePriceController::class, 'getProcessedManifestData']);
+    Route::get('/invoice/duplicate-analysis', [InvoicePriceController::class, 'getDuplicateAnalysis']);
+    Route::post('/invoice/preview-export', [InvoicePriceController::class, 'previewExportData']);
+});
 // Route::middleware('auth:sanctum')->group(function () {
 
 //     // // Route::post('/shipping-plans', [ShippingPlanController::class, 'store']);

@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Client;
+use App\Services\InvoicePriceService;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -18,12 +19,14 @@ class AutocountARInvoiceExport implements FromCollection, WithHeadings, WithColu
     protected $consignorId;
     protected $startDate;
     protected $endDate;
+    protected $invoicePriceService;
 
     public function __construct($consignorId, $startDate, $endDate)
     {
         $this->consignorId = $consignorId;
         $this->startDate = $startDate;
         $this->endDate = $endDate;
+        $this->invoicePriceService = new InvoicePriceService();
     }
 
     private function getExportCount()
@@ -134,39 +137,17 @@ class AutocountARInvoiceExport implements FromCollection, WithHeadings, WithColu
         $consignor = Client::find($this->consignorId);
         $consignorCode = $consignor ? $consignor->code : "";
 
-        // Get manifest_info_ids based on the date range, excluding soft-deleted records
-        $manifestInfoIds = DB::table('manifest_infos')
-            ->whereBetween('date', [
-                Carbon::parse($this->startDate)->startOfDay(),
-                Carbon::parse($this->endDate)->endOfDay()
-            ])
-            ->whereNull('deleted_at')
-            ->pluck('id');
-
-        // Get manifest_lists data, excluding soft-deleted records
-        $manifestData = DB::table('manifest_lists')
-            ->where('consignor_id', $this->consignorId)
-            ->whereIn('manifest_info_id', $manifestInfoIds)
-            ->whereNull('deleted_at')
-            ->get();
-
-        // Get all related manifest_info_id
-        $manifestInfos = DB::table('manifest_infos')
-            ->whereIn('id', $manifestInfoIds)
-            ->whereNull('deleted_at')
-            ->pluck('date', 'id');
-
-        // arrange manifestData based on delivery date
-        $manifestData = $manifestData->sortByDesc(function ($row) use ($manifestInfos) {
-            return isset($manifestInfos[$row->manifest_info_id])
-                ? Carbon::parse($manifestInfos[$row->manifest_info_id])
-                : Carbon::createFromTimestamp(0);
-        })->values();
+        // Use the new service to process manifest prices with maximum price logic
+        $processedManifestData = $this->invoicePriceService->processManifestPricesByDateRange(
+            $this->consignorId, 
+            $this->startDate, 
+            $this->endDate
+        );
 
         $exportNo = $this->generateExportNo();
         $exportDate = Carbon::now()->format('d/m/Y');
 
-        foreach ($manifestData as $row) {
+        foreach ($processedManifestData as $row) {
             $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
 
             $data[] = [

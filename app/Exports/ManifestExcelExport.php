@@ -58,7 +58,8 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
 
     {
         $data = [];
-        $totalPrice = 0;
+        // 改为：按相同 cn_no 仅取最大 total_price 用于合计
+        $maxPriceByCn = [];
 
         $consignor = Client::find($this->consignorId);
         $consignorName = $consignor ? $consignor->name : "UNKNOWN";
@@ -105,10 +106,26 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
 
         $data[] = ["Item", "Description", "Consignment Note", "Delivery Date", "Qty", "Weight", "UOM", "Total RM"];
 
-        $counter = 1;
+        // 先找出每个 cn_no 的最大价格记录
+        $maxRecordsByCn = [];
         foreach ($manifestData as $row) {
             $rowTotal = !empty($row->total_price) ? floatval($row->total_price) : 0;
-            $totalPrice += $rowTotal;
+            $cn = (string) $row->cn_no;
+            
+            if (!array_key_exists($cn, $maxRecordsByCn) || $rowTotal > $maxRecordsByCn[$cn]['total_price']) {
+                $maxRecordsByCn[$cn] = [
+                    'row' => $row,
+                    'total_price' => $rowTotal
+                ];
+            }
+        }
+
+        // 只显示每个 cn_no 的最大价格记录
+        $counter = 1;
+        foreach ($maxRecordsByCn as $cn => $record) {
+            $row = $record['row'];
+            $rowTotal = $record['total_price'];
+            $maxPriceByCn[$cn] = $rowTotal;
 
             $weight = floatval($row->kg) + (floatval($row->gram) / 1000);
 
@@ -129,7 +146,8 @@ class ManifestExcelExport implements FromCollection, WithHeadings, WithStyles, W
         }
 
         $data[] = ["", "", "", "", "", "", "", ""];
-        $data[] = ["", "", "", "", "", "", "TOTAL PRICE:", number_format((float) $totalPrice, 2, '.', '')];
+        $sumByMax = array_sum($maxPriceByCn);
+        $data[] = ["", "", "", "", "", "", "TOTAL PRICE:", number_format((float) $sumByMax, 2, '.', '')];
 
         return new \Illuminate\Support\Collection($data);
     }
