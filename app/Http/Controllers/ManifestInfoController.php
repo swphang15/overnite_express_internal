@@ -364,7 +364,7 @@ class ManifestInfoController extends Controller
                 'manifest_lists.cn_no AS Consignment_Note',
                 DB::raw("DATE_FORMAT(manifest_infos.date, '%d-%m-%Y') AS Delivery_Date"),
                 'manifest_lists.pcs AS Qty',
-                'manifest_lists.total_price AS Total_RM'
+                DB::raw("FORMAT(manifest_lists.total_price, 2) AS Total_RM")
             );
 
 
