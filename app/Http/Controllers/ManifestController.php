@@ -634,28 +634,22 @@ class ManifestController extends Controller
                 ->where('id', '!=', $id)
                 ->exists();
 
-            if ($duplicate) {
-                $warning = "CN No: {$validatedData['cn_no']} already exists, total_price set to 0";
-                $totalPrice = 0;
-                $basePrice = 0;
-                // $miscCharge = 0;
-            } else {
-                $totalDetails = $this->calculate_total_price(
-                    $validatedData['fuel_surcharge'],
-                    $validatedData['misc_charge'],
-                    $validatedData['origin'],
-                    $validatedData['destination'],
-                    $validatedData['consignor_id'],
-                    $validatedData['kg']
-                );
-                $totalPrice = $totalDetails['total'];
-                $basePrice = $totalDetails['base_price'];
-                // $miscCharge = $this->getMiscCharge(
-                //     $validatedData['consignor_id'],
-                //     $validatedData['origin'],
-                //     $validatedData['destination']
-                // );
+            // 总是计算真实价格，不管是否重复
+            $totalDetails = $this->calculate_total_price(
+                $validatedData['fuel_surcharge'],
+                $validatedData['misc_charge'],
+                $validatedData['origin'],
+                $validatedData['destination'],
+                $validatedData['consignor_id'],
+                $validatedData['kg']
+            );
+            $totalPrice = $totalDetails['total'];
+            $basePrice = $totalDetails['base_price'];
 
+            // 如果重复，只给警告，但保持真实价格
+            if ($duplicate) {
+                $warning = "CN No: {$validatedData['cn_no']} already exists. Invoice total will use the maximum among duplicates. This row keeps its own calculated price.";
+            } else {
                 $warning = null;
             }
 
